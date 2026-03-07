@@ -1,35 +1,67 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useMemo, useState } from "react";
+import FilterSidebar from "./components/FilterSidebar";
+import ListingGrid from "./components/ListingGrid";
+import listingsData from "./data/listings";
+import applyFilters from "./utils/applyFilters";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [filters, setFilters] = useState({
+    price: [0, 5000],
+    beds: "any",
+    propertyType: "all",
+    maxDistance: 10,
+    amenities: {
+      parking: false,
+      laundry: false,
+      petFriendly: false,
+      furnished: false,
+    },
+  });
+
+  const [favorites, setFavorites] = useState(new Set());
+
+  const filteredListings = useMemo(() => {
+    return applyFilters(listingsData, filters);
+  }, [filters]);
+
+  const toggleFavorite = (id) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+
+      return next;
+    });
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="min-h-screen bg-slate-50">
+      <div className="mx-auto flex max-w-[1600px] gap-6 px-6 py-6">
+        <FilterSidebar filters={filters} setFilters={setFilters} />
+
+        <main className="flex-1">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-red-600">Available Housing</p>
+              <h1 className="text-3xl font-semibold text-slate-900">
+                Showing {filteredListings.length} listings
+              </h1>
+            </div>
+          </div>
+
+          <ListingGrid
+            listings={filteredListings}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+          />
+        </main>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
