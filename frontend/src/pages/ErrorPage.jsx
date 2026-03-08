@@ -7,10 +7,7 @@ const ErrorPage = () => {
     <div className='flex flex-col gap-2'>404 Error
 
         <Link to="/">Home</Link>
-
     </div>
-
-    
   )
 }
 
