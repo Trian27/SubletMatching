@@ -13,6 +13,8 @@ const listings = [
       Furnished: false,
     },
     image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688",
+    landlordNum: "1-800-800-8000",
+    landlordEmail: "example@gmail.com"
   },
   {
     id: 2,
@@ -22,7 +24,7 @@ const listings = [
     propertyType: "apartment",
     distance: 0.5,
     amenities: {
-      Parking: false,
+      Parking: true,
       Laundry: true,
       Pet_Friendly: true,
       Furnished: true,
