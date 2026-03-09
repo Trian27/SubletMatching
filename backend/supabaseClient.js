@@ -26,17 +26,22 @@ function createMockClient() {
 
   const tables = {
     listings: [
-      { id: 1, title: 'Sunny Studio on College Ave', description: 'Cozy studio right on College Ave, steps from the Rutgers Student Center.', price: 950, city: 'New Brunswick', address: '123 College Ave', campus: 'College Ave', bedrooms: 0, bathrooms: 1, available_from: '2026-06-01', available_to: '2026-08-31', user_id: 'user_1', created_at: '2026-01-15T10:00:00Z' },
-      { id: 2, title: 'Spacious 2BR on Easton Ave', description: 'Large 2-bedroom right on Easton Ave, walk to College Ave campus.', price: 1800, city: 'New Brunswick', address: '250 Easton Ave, Apt 3A', campus: 'College Ave', bedrooms: 2, bathrooms: 1, available_from: '2026-05-15', available_to: '2026-08-31', user_id: 'user_2', created_at: '2026-02-01T14:30:00Z' },
-      { id: 3, title: 'Affordable Room near Livi', description: 'Private room in a 4BR house on Suttons Lane, 5 min to Livingston campus.', price: 650, city: 'Piscataway', address: '87 Suttons Ln', campus: 'Livingston', bedrooms: 1, bathrooms: 1, available_from: '2026-06-01', available_to: '2026-08-15', user_id: 'user_3', created_at: '2026-02-10T09:00:00Z' },
-      { id: 4, title: 'Modern 1BR at The Yard', description: 'Recently built apartment at The Yard with gym and parking included.', price: 1500, city: 'New Brunswick', address: '101 Somerset St, Unit 4C', campus: 'College Ave', bedrooms: 1, bathrooms: 1, available_from: '2026-05-20', available_to: '2026-08-31', user_id: 'user_1', created_at: '2026-02-20T16:45:00Z' },
-      { id: 5, title: '3BR House on Hamilton St', description: 'Full house steps from Cook/Douglass campus, big backyard.', price: 2800, city: 'New Brunswick', address: '45 Hamilton St', campus: 'Cook/Douglass', bedrooms: 3, bathrooms: 2, available_from: '2026-06-01', available_to: '2026-08-20', user_id: 'user_4', created_at: '2026-03-01T12:00:00Z' },
-      { id: 6, title: '1BR near Busch Campus', description: 'Quiet apartment on Bartholomew Rd, walk to SERC and ARC.', price: 1100, city: 'Piscataway', address: '22 Bartholomew Rd', campus: 'Busch', bedrooms: 1, bathrooms: 1, available_from: '2026-06-01', available_to: '2026-08-31', user_id: 'user_5', created_at: '2026-03-05T11:00:00Z' },
-      { id: 7, title: 'Room in Easton Ave House', description: 'Furnished room in shared house, 2 min walk to Grease Trucks.', price: 750, city: 'New Brunswick', address: '180 Easton Ave', campus: 'College Ave', bedrooms: 1, bathrooms: 1, available_from: '2026-05-25', available_to: '2026-08-15', user_id: 'user_6', created_at: '2026-03-06T08:30:00Z' },
-      { id: 8, title: '2BR on George St', description: 'Renovated 2-bedroom near downtown New Brunswick, close to train station.', price: 2000, city: 'New Brunswick', address: '55 George St, Apt 2B', campus: 'College Ave', bedrooms: 2, bathrooms: 1, available_from: '2026-06-01', available_to: '2026-08-31', user_id: 'user_7', created_at: '2026-03-06T14:00:00Z' },
-      { id: 9, title: 'Private Room off Livingston Ave', description: 'Room in a quiet 3BR house, 10 min bus to Busch campus.', price: 700, city: 'New Brunswick', address: '310 Livingston Ave', campus: 'Livingston', bedrooms: 1, bathrooms: 1, available_from: '2026-06-15', available_to: '2026-08-31', user_id: 'user_8', created_at: '2026-03-07T09:00:00Z' },
-      { id: 10, title: 'Studio near Douglass Library', description: 'Small studio on Nichol Ave, perfect for summer sublet near Cook campus.', price: 850, city: 'New Brunswick', address: '60 Nichol Ave', campus: 'Cook/Douglass', bedrooms: 0, bathrooms: 1, available_from: '2026-06-01', available_to: '2026-08-15', user_id: 'user_9', created_at: '2026-03-07T10:00:00Z' },
+      { id: 1, title: 'Sunny Studio on College Ave', description: 'Cozy studio right on College Ave, steps from the Rutgers Student Center.', price_monthly: 950, campus_location: 'College Ave', beds: 0, property_type: 'Studio', distance: '0.2 miles', amenities: { parking: true, laundry: true, gym: false }, host_id: 'user_1', created_at: '2026-01-15T10:00:00Z' },
+      { id: 2, title: 'Spacious 2BR on Easton Ave', description: 'Large 2-bedroom right on Easton Ave, walk to College Ave campus.', price_monthly: 1800, campus_location: 'College Ave', beds: 2, property_type: 'Apartment', distance: '0.3 miles', amenities: { parking: false, laundry: true, gym: false }, host_id: 'user_2', created_at: '2026-02-01T14:30:00Z' },
+      { id: 3, title: 'Affordable Room near Livi', description: 'Private room in a 4BR house on Suttons Lane, 5 min to Livingston campus.', price_monthly: 650, campus_location: 'Livingston', beds: 1, property_type: 'Room', distance: '0.5 miles', amenities: { parking: true, laundry: false, gym: false }, host_id: 'user_3', created_at: '2026-02-10T09:00:00Z' },
+      { id: 4, title: 'Modern 1BR at The Yard', description: 'Recently built apartment at The Yard with gym and parking included.', price_monthly: 1500, campus_location: 'College Ave', beds: 1, property_type: 'Apartment', distance: '0.4 miles', amenities: { parking: true, laundry: true, gym: true }, host_id: 'user_1', created_at: '2026-02-20T16:45:00Z' },
+      { id: 5, title: '3BR House on Hamilton St', description: 'Full house steps from Cook/Douglass campus, big backyard.', price_monthly: 2800, campus_location: 'Cook/Douglass', beds: 3, property_type: 'House', distance: '0.1 miles', amenities: { parking: true, laundry: true, gym: false }, host_id: 'user_4', created_at: '2026-03-01T12:00:00Z' },
+      { id: 6, title: '1BR near Busch Campus', description: 'Quiet apartment on Bartholomew Rd, walk to SERC and ARC.', price_monthly: 1100, campus_location: 'Busch', beds: 1, property_type: 'Apartment', distance: '0.6 miles', amenities: { parking: false, laundry: true, gym: false }, host_id: 'user_5', created_at: '2026-03-05T11:00:00Z' },
+      { id: 7, title: 'Room in Easton Ave House', description: 'Furnished room in shared house, 2 min walk to Grease Trucks.', price_monthly: 750, campus_location: 'College Ave', beds: 1, property_type: 'Room', distance: '0.2 miles', amenities: { parking: false, laundry: true, gym: false }, host_id: 'user_6', created_at: '2026-03-06T08:30:00Z' },
+      { id: 8, title: '2BR on George St', description: 'Renovated 2-bedroom near downtown New Brunswick, close to train station.', price_monthly: 2000, campus_location: 'College Ave', beds: 2, property_type: 'Apartment', distance: '0.7 miles', amenities: { parking: true, laundry: false, gym: false }, host_id: 'user_7', created_at: '2026-03-06T14:00:00Z' },
+      { id: 9, title: 'Private Room off Livingston Ave', description: 'Room in a quiet 3BR house, 10 min bus to Busch campus.', price_monthly: 700, campus_location: 'Livingston', beds: 1, property_type: 'Room', distance: '1.2 miles', amenities: { parking: true, laundry: false, gym: false }, host_id: 'user_8', created_at: '2026-03-07T09:00:00Z' },
+      { id: 10, title: 'Studio near Douglass Library', description: 'Small studio on Nichol Ave, perfect for summer sublet near Cook campus.', price_monthly: 850, campus_location: 'Cook/Douglass', beds: 0, property_type: 'Studio', distance: '0.3 miles', amenities: { parking: false, laundry: true, gym: false }, host_id: 'user_9', created_at: '2026-03-07T10:00:00Z' },
     ],
+    favorites: [
+      { id: 1, user_id: 'user_1', listing_id: 3, created_at: '2026-03-08T10:00:00Z' },
+      { id: 2, user_id: 'user_1', listing_id: 5, created_at: '2026-03-08T11:00:00Z' },
+      { id: 3, user_id: 'user_2', listing_id: 1, created_at: '2026-03-08T12:00:00Z' },
+    ]
   }
 
   function buildQuery(tableName) {
@@ -51,7 +56,11 @@ function createMockClient() {
     let orderAsc = true
 
     const builder = {
-      select() { doSelect = true; return builder },
+      select(selectClause = '*') { 
+        doSelect = true
+        builder.selectClause = selectClause
+        return builder 
+      },
       eq(col, val) { filters.push(r => String(r[col]) === String(val)); return builder },
       gte(col, val) { filters.push(r => r[col] >= val); return builder },
       lte(col, val) { filters.push(r => r[col] <= val); return builder },
@@ -89,6 +98,18 @@ function createMockClient() {
           } else {
             let matched = tables[tableName]
             for (const f of filters) matched = matched.filter(f)
+            
+            // Handle JOIN queries for favorites with listings
+            if (tableName === 'favorites' && builder.selectClause && builder.selectClause.includes('listings (*)')) {
+              matched = matched.map(favorite => {
+                const listing = tables.listings.find(l => l.id === favorite.listing_id)
+                return {
+                  ...favorite,
+                  listings: listing || null
+                }
+              })
+            }
+            
             if (orderCol) {
               matched = [...matched].sort((a, b) => {
                 if (a[orderCol] < b[orderCol]) return orderAsc ? -1 : 1
