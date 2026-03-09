@@ -3,18 +3,22 @@ import React from 'react'
 
 const CardDescription = ({foundListing}) => {
   return (
-        <div className = "flex flex-col">
+        <div className = "flex flex-col gap-6">  
+            <div className='pb-8 mb-6 border-b border-gray-200 flex flex-col gap-6'>
+                <div>   
+                    <h1 className= "text-3xl font-bold text-gray-900 mb-2" >{foundListing.title}</h1>
+                    <h3 className='size-6 text-gray-600 w-auto'>Insert location</h3>   
+
+                </div>
+                <div>
+                    <h3 className='size-5 text-black-600 w-auto text-lg'>{foundListing.beds} Bedrooms | X Bathrooms | {foundListing.distance} miles from campus</h3>
+                </div>
+                <div>
+                    <h3 className='size-5 text-black-600 w-auto text-lg'>Available when </h3>
+                </div>
+            </div>          
             <div>
-                <h1>{foundListing.title}</h1>
-            </div>
-            <div>
-                Insert location
-            </div>
-            <div>
-                {foundListing.beds} Bedrooms | X Bathrooms | {foundListing.distance} miles from campus | Available when 
-            </div>
-            <div>
-                About this Property
+                <h2>About this Property</h2>
                 <p>
                     Insert description
                 </p>

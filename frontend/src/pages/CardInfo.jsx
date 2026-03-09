@@ -12,18 +12,20 @@ const CardInfo = () => {
   if (foundListing){
     const listingImages = foundListing.image;
     return (
-    <>
-        <div className='container mx-auto px-4 py-8'>
-            <Link to="/" className="text-med font-large text-red-600 pl-4">
-                ← Back to Search
-            </Link>
+    <div className='bg-white'>
+        <div className='container mx-auto px-30 py-10'>
+            <div className="grid grid-cols-1 gap-8">
+                <Link to="/" className="text-lg bold w-auto font-large text-red-600 pl-4">
+                    ← Back to Search
+                </Link>
 
-            <div className = "flex items-center justify-center">
-                <img className = "max-w-md max-h-48" src={listingImages} alt={foundListing.title}/>
+                <div className = "flex items-center justify-center">
+                    <img className = "w-1/2" src={listingImages} alt={foundListing.title}/>
+                </div>
+                <CardDescription foundListing={foundListing}/>
             </div>
-            <CardDescription foundListing={foundListing}/>
         </div>
-    </>
+    </div>
 
     )
   }
