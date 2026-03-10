@@ -3,6 +3,7 @@ import FilterSidebar from "../components/FilterSidebar";
 import ListingGrid from "../components/ListingGrid";
 import listingsData from "../data/listings";
 import applyFilters from "../utils/applyFilters";
+import { useFavorites } from "../context/FavoritesContext";
 
 function ListingPage() {
   const [filters, setFilters] = useState({
@@ -18,25 +19,11 @@ function ListingPage() {
     },
   });
 
-  const [favorites, setFavorites] = useState(new Set());
+  const { favorites, toggleFavorite } = useFavorites();
 
   const filteredListings = useMemo(() => {
     return applyFilters(listingsData, filters);
   }, [filters]);
-
-  const toggleFavorite = (id) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-
-      return next;
-    });
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">

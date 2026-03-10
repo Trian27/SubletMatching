@@ -25,11 +25,11 @@ const CardDescription = ({foundListing}) => {
             </div>
             <div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">Amenities</h2>
-                <ul class='grid grid-flow-col grid-rows-3 gap-3 sm:grid-cols-2'>
+                <ul className='grid grid-flow-col grid-rows-3 gap-3 sm:grid-cols-2'>
                     {Object.entries(foundListing.amenities)
-                        .filter(([key,value]) => value)
+                        .filter(([,value]) => value)
                         .map(([key]) => (
-                            <li key="key">{key.replaceAll('_',' ')}</li>
+                            <li key={key}>{key.replaceAll('_',' ')}</li>
                         )   
                     )}
                 </ul>

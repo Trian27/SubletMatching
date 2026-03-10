@@ -2,8 +2,14 @@ import { Link } from "react-router-dom";
 
 function ListingCard({ listing, isFavorited, onToggleFavorite }) {
   const lId = listing.id;
+
+  const handleFavoriteClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onToggleFavorite(listing.id);
+  };
+
   return (
-    
     <Link to={`/listings/${lId}`}>
       <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
         <div className="relative">
@@ -18,7 +24,9 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
           </div>
 
           <button
-            onClick={() => onToggleFavorite(listing.id)}
+            type="button"
+            aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
+            onClick={handleFavoriteClick}
             className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-2xl shadow"
           >
             {isFavorited ? "♥" : "♡"}
