@@ -1,6 +1,5 @@
 import React from 'react'
 import { useParams } from 'react-router-dom'
-import listings from '../data/listings';
 import ErrorPage from './ErrorPage';
 import { Link } from 'react-router-dom';
 import CardDescription from '../components/CardDescription';
