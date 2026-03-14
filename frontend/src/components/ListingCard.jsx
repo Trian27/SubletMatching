@@ -65,7 +65,7 @@ import { Link } from "react-router-dom";
 // export default ListingCard;
 
 function ListingCard({ listing, isFavorited, onToggleFavorite }) {
-  const l_ID = listing.id
+  const lId = listing.id
   const availRange =
     listing.available_from && listing.available_to
       ? `${formatDate(listing.available_from)} – ${formatDate(listing.available_to)}`

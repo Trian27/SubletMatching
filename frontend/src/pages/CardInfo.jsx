@@ -1,4 +1,5 @@
 import React from 'react'
+import { useEffect, useMemo, useState} from 'react';
 import { useParams } from 'react-router-dom'
 import ErrorPage from './ErrorPage';
 import { Link } from 'react-router-dom';
@@ -6,8 +7,33 @@ import CardDescription from '../components/CardDescription';
 import Sidebar from '../components/Sidebar';
 
 const CardInfo = () => {
-  const params = useParams();
-  const foundListing = listings.find(listing => listing.id == params.listingId)
+    const params = useParams();
+
+
+    const API_URL = "http://localhost:3001";
+    
+    const [listing, setListings] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+    fetch(`${API_URL}/listings/${params.listingId}`)
+    .then((res) => {
+        if (!res.ok) throw new Error("Failed to fetch listings");
+        return res.json();
+    })
+    .then((data) => {
+        setListings(data);
+        setLoading(false);
+    })
+    .catch((err) => {
+        setError(err.message);
+        setLoading(false);
+    });
+    }, []);
+    const foundListing = useMemo(() => {
+        return listing;
+    }, [listing]);
 
   if (foundListing){
     const listingImages = foundListing.image;
