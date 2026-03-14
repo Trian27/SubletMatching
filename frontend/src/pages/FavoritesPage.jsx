@@ -3,6 +3,7 @@ import listingsData from "../data/listings";
 import { useFavorites } from "../context/FavoritesContext";
 
 function FavoritesPage() {
+  
   const { favorites, toggleFavorite } = useFavorites();
   const favoriteListings = listingsData.filter((listing) =>
     favorites.has(listing.id)

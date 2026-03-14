@@ -11,7 +11,7 @@ const CardDescription = ({foundListing}) => {
 
                 </div>
                 <div>
-                    <h3 className='size-5 text-black-600 w-auto text-lg'>{foundListing.beds} Bedrooms | X Bathrooms | {foundListing.distance} miles from campus</h3>
+                    <h3 className='size-5 text-black-600 w-auto text-lg'>{foundListing.beds} Bedrooms | {foundListing.baths} Bathrooms | {foundListing.distance} miles from campus</h3>
                 </div>
                 <div>
                     <h3 className='size-5 text-black-600 w-auto text-lg'>Available when </h3>
@@ -20,7 +20,7 @@ const CardDescription = ({foundListing}) => {
             <div>
                 <h2 className='text-2xl font-bold text-gray-900 mb-4'>About this Property</h2>
                 <p>
-                    Insert description
+                    {foundListing.description}
                 </p>
             </div>
             <div>
