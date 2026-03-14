@@ -7,12 +7,14 @@ const listings = [
     propertyType: "apartment",
     distance: 0.3,
     amenities: {
-      parking: true,
-      laundry: true,
-      petFriendly: false,
-      furnished: false,
+      Parking: true,
+      Laundry: true,
+      Pet_Friendly: false,
+      Furnished: false,
     },
     image: "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688",
+    landlordNum: "1-800-800-8000",
+    landlordEmail: "example@gmail.com"
   },
   {
     id: 2,
@@ -22,10 +24,10 @@ const listings = [
     propertyType: "apartment",
     distance: 0.5,
     amenities: {
-      parking: false,
-      laundry: true,
-      petFriendly: true,
-      furnished: true,
+      Parking: true,
+      Laundry: true,
+      Pet_Friendly: true,
+      Furnished: true,
     },
     image: "https://images.unsplash.com/photo-1493809842364-78817add7ffb",
   },
