@@ -1,31 +1,39 @@
 import { Link } from "react-router-dom";
+import { formatAmenityLabel, normalizeListing } from "../utils/listingUtils";
 
 function ListingCard({ listing, isFavorited, onToggleFavorite }) {
-  const lId = listing.id;
+  const normalizedListing = normalizeListing(listing);
+  const lId = normalizedListing.id;
+  const activeAmenities = Object.entries(normalizedListing.amenities)
+    .filter(([, value]) => value)
+    .map(([key]) => formatAmenityLabel(key));
 
   const availRange =
-  listing.available_from && listing.available_to
-    ? `${formatDate(listing.available_from)} – ${formatDate(listing.available_to)}`
+  normalizedListing.available_from && normalizedListing.available_to
+    ? `${formatDate(normalizedListing.available_from)} – ${formatDate(normalizedListing.available_to)}`
     : null;
+  const distanceLabel = normalizedListing.campus
+    ? `${normalizedListing.distance} miles from ${normalizedListing.campus}`
+    : `${normalizedListing.distance} miles from campus`;
 
   const handleFavoriteClick = (event) => {
     event.preventDefault();
     event.stopPropagation();
-    onToggleFavorite(listing.id);
+    onToggleFavorite(normalizedListing.id);
   };
 
   return (
     <Link to={`/listings/${lId}`}>
-      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+      <div className="overflow-hidden rounded-lg bg-white shadow-sm">
         <div className="relative">
           <img
-            src={listing.image}
-            alt={listing.title}
+            src={normalizedListing.image}
+            alt={normalizedListing.title}
             className="h-56 w-full object-cover"
           />
 
           <div className="absolute bottom-4 left-4 rounded-full bg-red-600 px-4 py-2 text-lg font-semibold text-white shadow">
-            ${listing.price}/mo
+            ${normalizedListing.price}/mo
           </div>
 
           <button
@@ -39,28 +47,47 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
         </div>
 
         <div className="p-5">
-          <h2 className="text-3xl font-semibold text-slate-900">
-            {listing.title}
-          </h2>
+          <div className="flex items-start justify-between gap-3">
+            <h2 className="text-3xl font-semibold text-slate-900">
+              {normalizedListing.title}
+            </h2>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium capitalize text-slate-700">
+              {normalizedListing.propertyType}
+            </span>
+          </div>
 
-          <p className="mt-3 text-xl text-slate-600">
-            {listing.address}
-          </p>
+          {normalizedListing.address && (
+            <p className="mt-3 text-base text-slate-600">
+              {normalizedListing.address}
+            </p>
+          )}
 
           <div className="mt-4 flex flex-wrap gap-6 text-lg text-slate-700">
-            <span>{listing.bedrooms} beds</span>
-            <span>{listing.bathrooms} baths</span>
-            <span>{listing.propertyType }</span>
+            <span>{normalizedListing.beds} beds</span>
+            {normalizedListing.baths > 0 && (
+              <span>{normalizedListing.baths} baths</span>
+            )}
+            <span>{distanceLabel}</span>
           </div>
 
-          <div className="mt-5 flex items-center justify-between border-t pt-4 text-lg">
-            <span className="text-slate-600">
-              {listing.distance} from {listing.campus}
-            </span>
-            <span className="font-medium text-red-600">
-              {availRange}
-            </span>
-          </div>
+          {activeAmenities.length > 0 && (
+            <p className="mt-4 text-sm text-slate-500">
+              {activeAmenities.join(" • ")}
+            </p>
+          )}
+
+          {(availRange || normalizedListing.landlordEmail) && (
+            <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm">
+              <span className="truncate text-slate-600">
+                {normalizedListing.landlordEmail || "Contact info available in details"}
+              </span>
+              {availRange && (
+                <span className="font-medium text-red-600">
+                  {availRange}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </Link>

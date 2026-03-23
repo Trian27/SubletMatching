@@ -1,11 +1,11 @@
 import ListingGrid from "../components/ListingGrid";
-import listingsData from "../data/listings";
 import { useFavorites } from "../context/FavoritesContext";
+import { useListings } from "../context/ListingsContext";
 
 function FavoritesPage() {
-  
   const { favorites, toggleFavorite } = useFavorites();
-  const favoriteListings = listingsData.filter((listing) =>
+  const { listings } = useListings();
+  const favoriteListings = listings.filter((listing) =>
     favorites.has(listing.id)
   );
 
