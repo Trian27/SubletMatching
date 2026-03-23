@@ -50,7 +50,7 @@ export function FavoritesProvider({ children }) {
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+
 export function useFavorites() {
   const ctx = useContext(FavoritesContext);
 

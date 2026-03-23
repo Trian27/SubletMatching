@@ -55,7 +55,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
 
           <div className="mt-5 flex items-center justify-between border-t pt-4 text-lg">
             <span className="text-slate-600">
-              {listing.distance} from {listing.campus}
+              {listing.distance} from {listing.campus_location}
             </span>
             <span className="font-medium text-red-600">
               {availRange}

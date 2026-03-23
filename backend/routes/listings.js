@@ -41,12 +41,18 @@ router.get('/', async (req, res) => {
       title: listing.title,
       price: listing.price_monthly,  // Map price_monthly to price
       beds: listing.beds,
+      bedrooms: listing.beds,        // Map beds to bedrooms for frontend
+      bathrooms: listing.bathrooms,
       propertyType: listing.property_type,  // Map property_type to propertyType
       distance: listing.distance,
+      address: listing.address,
+      city: listing.city,
+      available_from: listing.available_from,
+      available_to: listing.available_to,
       amenities: listing.amenities || {},  // Ensure amenities is an object
-      // Include additional fields that might be useful
       campus_location: listing.campus_location,
       description: listing.description,
+      image: listing.image_url,      // Map image_url to image for frontend
       image_url: listing.image_url,
       created_at: listing.created_at
     }))
@@ -74,12 +80,18 @@ router.get('/:id', async (req, res) => {
       title: data.title,
       price: data.price_monthly,  // Map price_monthly to price
       beds: data.beds,
+      bedrooms: data.beds,        // Map beds to bedrooms for frontend
+      bathrooms: data.bathrooms,
       propertyType: data.property_type,  // Map property_type to propertyType
       distance: data.distance,
+      address: data.address,
+      city: data.city,
+      available_from: data.available_from,
+      available_to: data.available_to,
       amenities: data.amenities || {},  // Ensure amenities is an object
-      // Include additional fields that might be useful
       campus_location: data.campus_location,
       description: data.description,
+      image: data.image_url,      // Map image_url to image for frontend
       image_url: data.image_url,
       created_at: data.created_at
     }
