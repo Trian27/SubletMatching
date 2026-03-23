@@ -1,73 +1,23 @@
-import { useMemo, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useMemo, useState } from "react";
 import FilterSidebar from "../components/FilterSidebar";
 import ListingGrid from "../components/ListingGrid";
-import listingsData from "../data/listings";
 import applyFilters from "../utils/applyFilters";
 import { useFavorites } from "../context/FavoritesContext";
-
+import { useListings } from "../context/ListingsContext";
 
 function ListingPage() {
-
-  const API_URL = "http://localhost:3001";
-
-  const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
+  const { listings } = useListings();
+  const { favorites, toggleFavorite } = useFavorites();
   const [filters, setFilters] = useState({
     price: [0, 5000],
     beds: "any",
     propertyType: "all",
-    maxDistance: 10,
-    amenities: {
-      parking: false,
-      laundry: false,
-      petFriendly: false,
-      furnished: false,
-    },
   });
-
-  const [favorites, setFavorites] = useState(new Set());
-
-  // const { favorites, toggleFavorite } = useFavorites();
-
-  // const filteredListings = useMemo(() => {
-  //   return applyFilters(listingsData, filters);
-  // }, [filters]);
-
-    useEffect(() => {
-    fetch(`${API_URL}/listings`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to fetch listings");
-        return res.json();
-      })
-      .then((data) => {
-        setListings(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
 
   const filteredListings = useMemo(() => {
     return applyFilters(listings, filters);
   }, [listings, filters]);
-
-  const toggleFavorite = (id) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-
-      return next;
-    });
-  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -75,29 +25,40 @@ function ListingPage() {
         <FilterSidebar filters={filters} setFilters={setFilters} />
 
         <main className="flex-1">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-red-600">Available Housing</p>
               <h1 className="text-3xl font-semibold text-slate-900">
-                {loading
-                  ? "Loading listings..."
-                  : `Showing ${filteredListings.length} listings`}              
+                Showing {filteredListings.length} listings
               </h1>
-              {error && (
-                <p className="mt-1 text-sm text-red-500">
-                  Could not connect to server — make sure the backend is running.
-                </p>
-              )}
             </div>
+
+            <Link
+              to="/listings/new"
+              aria-label="Add listing"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-6 w-6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </Link>
           </div>
 
-          {!loading && (
           <ListingGrid
             listings={filteredListings}
             favorites={favorites}
             onToggleFavorite={toggleFavorite}
           />
-          )}
         </main>
       </div>
     </div>
@@ -105,4 +66,3 @@ function ListingPage() {
 }
 
 export default ListingPage;
-

@@ -8,10 +8,10 @@ function FilterSidebar({ filters, setFilters }) {
     }));
   };
 
-  const handleCampusChange = (e) => {
+  const handlePropertyTypeChange = (e) => {
     setFilters((prev) => ({
       ...prev,
-      campus: e.target.value,
+      propertyType: e.target.value,
     }));
   };
 
@@ -37,7 +37,7 @@ function FilterSidebar({ filters, setFilters }) {
     setFilters({
       price: [0, 5000],
       beds: "any",
-      campus: "all",
+      propertyType: "all",
     });
   };
 
@@ -73,18 +73,18 @@ function FilterSidebar({ filters, setFilters }) {
 
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-700">
-            Campus
+            Property Type
           </label>
           <select
-            value={filters.campus}
-            onChange={handleCampusChange}
+            value={filters.propertyType}
+            onChange={handlePropertyTypeChange}
             className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-red-500"
           >
-            <option value="all">All Campuses</option>
-            <option value="College Ave">College Ave</option>
-            <option value="Busch">Busch</option>
-            <option value="Livingston">Livingston</option>
-            <option value="Cook/Douglass">Cook/Douglass</option>
+            <option value="all">All Types</option>
+            <option value="apartment">Apartment</option>
+            <option value="house">House</option>
+            <option value="studio">Studio</option>
+            <option value="townhome">Townhome</option>
           </select>
         </div>
 

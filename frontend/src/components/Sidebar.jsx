@@ -1,28 +1,38 @@
-import React from 'react'
+const Sidebar = ({ foundListing }) => {
+  const hasPhone = Boolean(foundListing.landlordNum);
+  const hasEmail = Boolean(foundListing.landlordEmail);
 
-const Sidebar = ({foundListing}) => {
   return (
-    <div className='bg-gray-100 rounded-2xl p-6 sticky top-24 h-[350px]'>
-        <h2 className='text-3xl font-bold text-[#cc0033] mb-6'>
-            $2400/month
+    <div className="sticky top-24 h-fit rounded-2xl bg-gray-100 p-6">
+        <h2 className="mb-6 text-3xl font-bold text-[#cc0033]">
+            ${foundListing.price}/month
         </h2>
         <div>
-            <h2 className='font-bold'>
+            <h2 className="font-bold">
                 Contact Landlord
             </h2>
-            <h3>
-                Name
-            </h3>
         </div>
         <div>
-            <a className='hover:underline break-all' href={`tel:${foundListing.landlordNum}`}>{foundListing.landlordNum}</a>
+            {hasPhone ? (
+              <a className="break-all hover:underline" href={`tel:${foundListing.landlordNum}`}>
+                {foundListing.landlordNum}
+              </a>
+            ) : (
+              <span className="text-slate-500">Phone not provided</span>
+            )}
         </div>
         <div>
-            <a className='hover:underline break-all' href={`mailto:${foundListing.landlordEmail}`}>{foundListing.landlordEmail}</a>
+            {hasEmail ? (
+              <a className="break-all hover:underline" href={`mailto:${foundListing.landlordEmail}`}>
+                {foundListing.landlordEmail}
+              </a>
+            ) : (
+              <span className="text-slate-500">Email not provided</span>
+            )}
         </div>
-        <div className='flex flex-col pt-5 gap-5'>
-            <button className='w-full bg-[#cc0033] text-white py-3 rounded-lg font-medium hover:bg-[#a80029] transition-colors mb-3'>Request Tour</button>
-            <button className='w-full border border-[#cc0033] text-[#cc0033] py-3 rounded-lg font-medium hover:bg-[#cc0033] hover:text-white transition-colors'>Send Message</button>
+        <div className="flex flex-col gap-5 pt-5">
+            <button className="mb-3 w-full rounded-lg bg-[#cc0033] py-3 font-medium text-white transition-colors hover:bg-[#a80029]">Request Tour</button>
+            <button className="w-full rounded-lg border border-[#cc0033] py-3 font-medium text-[#cc0033] transition-colors hover:bg-[#cc0033] hover:text-white">Send Message</button>
         </div>
     </div>
   )
