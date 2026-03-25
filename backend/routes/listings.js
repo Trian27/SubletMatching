@@ -16,6 +16,7 @@ function mapListingRow(data) {
     campus_location: data.campus_location,
     description: data.description,
     image_url: data.image_url,
+    host_id: data.host_id,
     created_at: data.created_at,
   }
 }
@@ -65,6 +66,7 @@ router.get('/', async (req, res) => {
       campus_location: listing.campus_location,
       description: listing.description,
       image_url: listing.image_url,
+      host_id: listing.host_id,
       created_at: listing.created_at
     }))
 
@@ -98,6 +100,7 @@ router.get('/:id', async (req, res) => {
       campus_location: data.campus_location,
       description: data.description,
       image_url: data.image_url,
+      host_id: data.host_id,
       created_at: data.created_at
     }
     

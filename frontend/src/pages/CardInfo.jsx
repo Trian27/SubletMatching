@@ -25,7 +25,11 @@ const CardInfo = () => {
 
   const accessToken = session?.access_token ?? null;
 
-  const canShowActions = Boolean(accessToken);
+  const isOwner =
+    Boolean(session?.user?.id) &&
+    Boolean(foundListing?.host_id) &&
+    String(session.user.id) === String(foundListing.host_id);
+  const canShowActions = Boolean(accessToken) && isOwner;
 
   const initialEditValues = useMemo(() => {
     if (!foundListing) return null;
