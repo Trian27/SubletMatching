@@ -1,54 +1,93 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import listingsData from "../data/listings";
+import { getListingsApiBase } from "../api/listingsApi";
 import { getNextListingId, normalizeListing, normalizeListings } from "../utils/listingUtils";
 
 const ListingsContext = createContext(null);
-const STORAGE_KEY = "sublet_user_listings";
-
-function loadUserListingsFromStorage() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const parsed = JSON.parse(stored);
-    return normalizeListings(Array.isArray(parsed) ? parsed : []);
-  } catch (error) {
-    console.warn("Could not load listings from localStorage", error);
-    return [];
-  }
-}
 
 export function ListingsProvider({ children }) {
-  const baseListings = useMemo(() => normalizeListings(listingsData), []);
-  const [userListings, setUserListings] = useState(loadUserListingsFromStorage);
+  const fallbackListings = useMemo(() => normalizeListings(listingsData), []);
+  const [listings, setListings] = useState(fallbackListings);
+  const [hasLoadedFromApi, setHasLoadedFromApi] = useState(false);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userListings));
-    } catch (error) {
-      console.warn("Could not save listings to localStorage", error);
-    }
-  }, [userListings]);
+    let isCancelled = false;
 
-  const listings = useMemo(
-    () => [...userListings, ...baseListings],
-    [baseListings, userListings]
-  );
+    async function loadListingsFromApi() {
+      try {
+        const response = await fetch(`${getListingsApiBase()}/listings`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "Could not load listings from backend.");
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid listings response.");
+        }
+
+        const normalized = normalizeListings(
+          data.map((item) => ({
+            ...item,
+            campus: item.campus ?? item.campus_location ?? "",
+            image: item.image ?? item.image_url ?? "",
+          }))
+        );
+
+        if (!isCancelled) {
+          setListings(normalized);
+          setHasLoadedFromApi(true);
+        }
+      } catch (error) {
+        console.warn("Could not load listings from backend; using fallback data.", error);
+        if (!isCancelled) {
+          setHasLoadedFromApi(true);
+        }
+      }
+    }
+
+    loadListingsFromApi();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   const addListing = (listingInput) => {
-    setUserListings((prev) => {
+    setListings((prev) => {
       const nextListing = normalizeListing({
         ...listingInput,
         id:
           listingInput.id != null && listingInput.id !== ""
             ? listingInput.id
-            : getNextListingId([...baseListings, ...prev]),
+            : getNextListingId(prev),
       });
 
       return [nextListing, ...prev];
     });
+  };
+
+  const updateListing = (id, patch) => {
+    setListings((prev) => {
+      const idx = prev.findIndex((listing) => String(listing.id) === String(id));
+      if (idx === -1) return prev;
+
+      const updated = normalizeListing({
+        ...prev[idx],
+        ...patch,
+        id: prev[idx].id,
+      });
+
+      const next = [...prev];
+      next[idx] = updated;
+      return next;
+    });
+  };
+
+  const removeListing = (id) => {
+    setListings((prev) =>
+      prev.filter((listing) => String(listing.id) !== String(id))
+    );
   };
 
   const getListingById = (id) =>
@@ -56,7 +95,10 @@ export function ListingsProvider({ children }) {
 
   const value = {
     listings,
+    hasLoadedFromApi,
     addListing,
+    updateListing,
+    removeListing,
     getListingById,
   };
 

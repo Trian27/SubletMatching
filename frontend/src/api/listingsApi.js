@@ -45,3 +45,71 @@ export async function createListing(payload, options = {}) {
 
   return data;
 }
+
+/**
+ * PUT /listings/:id
+ * @param {string|number} id
+ * @param {Record<string, unknown>} payload
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function updateListing(id, payload, options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${getListingsApiBase()}/listings/${id}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not update listing.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+
+  return data;
+}
+
+/**
+ * DELETE /listings/:id
+ * @param {string|number} id
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function deleteListing(id, options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${getListingsApiBase()}/listings/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (response.status === 204) return;
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not delete listing.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+}
