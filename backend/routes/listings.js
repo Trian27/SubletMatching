@@ -1,7 +1,24 @@
 import { Router } from 'express'
-import { supabase } from '../supabaseClient.js'
+import { supabase, isSupabaseConfigured, createSupabaseClientWithToken } from '../supabaseClient.js'
+import { requireSupabaseUser } from '../middleware/requireSupabaseUser.js'
 
 const router = Router()
+
+function mapListingRow(data) {
+  return {
+    id: data.id,
+    title: data.title,
+    price: data.price_monthly,
+    beds: data.beds,
+    propertyType: data.property_type,
+    distance: data.distance,
+    amenities: data.amenities || {},
+    campus_location: data.campus_location,
+    description: data.description,
+    image_url: data.image_url,
+    created_at: data.created_at,
+  }
+}
 
 // GET all listings with Rutgers-specific filters
 router.get('/', async (req, res) => {
@@ -91,25 +108,44 @@ router.get('/:id', async (req, res) => {
 })
 
 // CREATE a new listing (Updated to match Frontend & Schema)
-router.post('/', async (req, res) => {
+router.post('/', requireSupabaseUser, async (req, res) => {
   try {
-    // Destructuring based on your Supabase Schema
-    const { 
-      title, 
-      description, 
-      price_monthly, 
-      campus_location, 
-      beds, 
-      property_type, 
-      distance, 
-      image_url, 
-      amenities, 
-      host_id 
+    const {
+      title,
+      description,
+      price_monthly,
+      campus_location,
+      beds,
+      property_type,
+      distance,
+      image_url,
+      amenities,
+      host_id: host_id_body,
     } = req.body
 
-    // Basic validation for required fields
-    if (!title || !price_monthly || !host_id) {
-      return res.status(400).json({ error: 'Title, price_monthly, and host_id are required' })
+    const host_id = isSupabaseConfigured
+      ? req.user?.id
+      : (host_id_body || 'guest')
+
+    const accessToken =
+      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
+
+    if (!title || !price_monthly) {
+      return res.status(400).json({ error: 'Title and price_monthly are required' })
+    }
+
+    if (!host_id) {
+      return res.status(400).json({
+        error: isSupabaseConfigured
+          ? 'Could not resolve host from session'
+          : 'host_id is required when not using Supabase auth',
+      })
     }
 
     // Validation: price_monthly must be positive
@@ -125,7 +161,7 @@ router.post('/', async (req, res) => {
       })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await authenticatedSupabase
       .from('listings')
       .insert({
         title,
@@ -142,27 +178,20 @@ router.post('/', async (req, res) => {
       .select()
       .single()
 
-    if (error) return res.status(400).json({ error: error.message })
-    
-    // Map the created listing to frontend expected format
-    const mappedListing = {
-      id: data.id,
-      title: data.title,
-      price: data.price_monthly,  // Map price_monthly to price
-      beds: data.beds,
-      propertyType: data.property_type,  // Map property_type to propertyType
-      distance: data.distance,
-      amenities: data.amenities || {},  // Ensure amenities is an object
-      // Include additional fields that might be useful
-      campus_location: data.campus_location,
-      description: data.description,
-      image_url: data.image_url,
-      created_at: data.created_at
+    if (error) {
+      console.error('POST /listings insert error:', error)
+      return res.status(400).json({ error: error.message })
     }
-    
-    res.status(201).json(mappedListing)
+
+    if (!data) {
+      console.error('POST /listings: insert returned no data')
+      return res.status(500).json({ error: 'Listing insert did not return a row.' })
+    }
+
+    res.status(201).json(mapListingRow(data))
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('POST /listings: unexpected error:', err)
+    res.status(500).json({ error: err?.message || 'Internal server error' })
   }
 })
 
@@ -266,13 +295,93 @@ router.delete('/favorites/:id', async (req, res) => {
   }
 })
 
-// DELETE a listing (RLS in Supabase will protect this)
-router.delete('/:id', async (req, res) => {
+// UPDATE a listing (owner only when using real Supabase)
+router.put('/:id', requireSupabaseUser, async (req, res) => {
   try {
-    const { error } = await supabase
+    const id = req.params.id
+
+    const { data: existing, error: fetchErr } = await supabase
       .from('listings')
-      .delete()
-      .eq('id', req.params.id)
+      .select('host_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !existing) {
+      return res.status(404).json({ error: 'Listing not found' })
+    }
+
+    if (
+      isSupabaseConfigured &&
+      String(existing.host_id) !== String(req.user.id)
+    ) {
+      return res.status(403).json({ error: 'You can only edit your own listings.' })
+    }
+
+    const updates = { ...req.body }
+    delete updates.id
+    delete updates.host_id
+    delete updates.created_at
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No updatable fields provided' })
+    }
+
+    const accessToken =
+      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
+
+    const { data, error } = await authenticatedSupabase
+      .from('listings')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) return res.status(400).json({ error: error.message })
+
+    res.json(mapListingRow(data))
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// DELETE a listing (owner only when using real Supabase)
+router.delete('/:id', requireSupabaseUser, async (req, res) => {
+  try {
+    const id = req.params.id
+
+    const { data: existing, error: fetchErr } = await supabase
+      .from('listings')
+      .select('host_id')
+      .eq('id', id)
+      .single()
+
+    if (fetchErr || !existing) {
+      return res.status(404).json({ error: 'Listing not found' })
+    }
+
+    if (
+      isSupabaseConfigured &&
+      String(existing.host_id) !== String(req.user.id)
+    ) {
+      return res.status(403).json({ error: 'You can only delete your own listings.' })
+    }
+
+    const accessToken =
+      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
+
+    const { error } = await authenticatedSupabase.from('listings').delete().eq('id', id)
 
     if (error) return res.status(400).json({ error: error.message })
     res.status(204).send()

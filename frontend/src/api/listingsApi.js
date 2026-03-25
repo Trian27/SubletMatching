@@ -1,0 +1,47 @@
+const DEFAULT_BASE = "http://localhost:3001";
+
+export function getListingsApiBase() {
+  const base = import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? DEFAULT_BASE;
+  return base;
+}
+
+/** Optional; set from Supabase session after login (e.g. session.access_token). */
+export function getListingsAccessToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("sublet_access_token");
+}
+
+/**
+ * POST /listings — body matches backend (price_monthly, campus_location, etc.).
+ * @param {Record<string, unknown>} payload
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function createListing(payload, options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  // Avoid sending bogus headers like "Bearer undefined".
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${getListingsApiBase()}/listings`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not create listing.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+
+  return data;
+}

@@ -5,7 +5,13 @@ dotenv.config()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-const hasRealCredentials = supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your-supabase-url-here'
+
+/** True when using real Supabase (JWT auth + DB). False when using in-memory mock. */
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your-supabase-url-here'
+)
+
+const hasRealCredentials = isSupabaseConfigured
 
 let supabase
 
@@ -18,6 +24,24 @@ if (hasRealCredentials) {
 }
 
 export { supabase }
+
+/**
+ * Create a Supabase client that authenticates as the user represented by `accessToken`.
+ * Used to ensure RLS policies evaluate `auth.uid()` correctly for write operations.
+ */
+export function createSupabaseClientWithToken(accessToken) {
+  if (!hasRealCredentials) return supabase
+  const token = accessToken?.trim()
+  if (!token) return supabase
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  })
+}
 
 // --------------- Mock client (used when .env has no real credentials) ---------------
 

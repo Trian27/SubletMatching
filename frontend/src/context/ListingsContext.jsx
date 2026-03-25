@@ -41,7 +41,10 @@ export function ListingsProvider({ children }) {
     setUserListings((prev) => {
       const nextListing = normalizeListing({
         ...listingInput,
-        id: getNextListingId([...baseListings, ...prev]),
+        id:
+          listingInput.id != null && listingInput.id !== ""
+            ? listingInput.id
+            : getNextListingId([...baseListings, ...prev]),
       });
 
       return [nextListing, ...prev];
