@@ -30,7 +30,11 @@ function FavoritesPage() {
         <ListingGrid
           listings={favoriteListings}
           favorites={favorites}
-          onToggleFavorite={toggleFavorite}
+          onToggleFavorite={(id) => {
+            Promise.resolve(toggleFavorite(id)).catch((error) => {
+              console.warn("Could not toggle favorite", error);
+            });
+          }}
         />
       )}
     </div>

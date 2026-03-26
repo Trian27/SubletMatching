@@ -57,3 +57,39 @@ CREATE POLICY "Users can delete own listings"
   FOR DELETE
   TO authenticated
   USING (host_id = auth.uid());
+
+-- 3) favorites table (per-user favorites)
+CREATE TABLE IF NOT EXISTS public.favorites (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  listing_id BIGINT NOT NULL REFERENCES public.listings(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (user_id, listing_id)
+);
+
+CREATE INDEX IF NOT EXISTS favorites_user_id_idx ON public.favorites (user_id);
+CREATE INDEX IF NOT EXISTS favorites_listing_id_idx ON public.favorites (listing_id);
+
+ALTER TABLE public.favorites ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own favorites" ON public.favorites;
+DROP POLICY IF EXISTS "Users can add own favorites" ON public.favorites;
+DROP POLICY IF EXISTS "Users can remove own favorites" ON public.favorites;
+
+CREATE POLICY "Users can view own favorites"
+  ON public.favorites
+  FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can add own favorites"
+  ON public.favorites
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can remove own favorites"
+  ON public.favorites
+  FOR DELETE
+  TO authenticated
+  USING (user_id = auth.uid());

@@ -113,3 +113,100 @@ export async function deleteListing(id, options = {}) {
     throw err;
   }
 }
+
+/**
+ * GET /listings/favorites
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function getFavorites(options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${getListingsApiBase()}/listings/favorites`, {
+    method: "GET",
+    headers,
+  });
+
+  const data = await response.json().catch(() => []);
+  if (!response.ok) {
+    const message =
+      typeof data?.error === "string" ? data.error : "Could not load favorites.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+/**
+ * POST /listings/favorites
+ * @param {string|number} listingId
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function addFavorite(listingId, options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${getListingsApiBase()}/listings/favorites`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ listing_id: listingId }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      typeof data?.error === "string" ? data.error : "Could not add favorite.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+  return data;
+}
+
+/**
+ * DELETE /listings/favorites/:favoriteId
+ * @param {string|number} favoriteId
+ * @param {{ accessToken?: string | null }} [options]
+ */
+export async function removeFavorite(favoriteId, options = {}) {
+  let token = options.accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+  if (token && token.length === 0) token = null;
+
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(
+    `${getListingsApiBase()}/listings/favorites/${favoriteId}`,
+    {
+      method: "DELETE",
+      headers,
+    }
+  );
+
+  if (response.status === 204) return;
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message =
+      typeof data?.error === "string" ? data.error : "Could not remove favorite.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+}
