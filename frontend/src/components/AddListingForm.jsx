@@ -4,6 +4,7 @@ import ListingImageGallery from "./ListingImageGallery";
 import Sidebar from "./Sidebar";
 import { createListing, getListingsAccessToken } from "../api/listingsApi";
 import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 import { MAX_LISTING_IMAGES, filesToListingImages } from "../utils/imageUtils";
 import { geocodeAddressToNearestCampus } from "../utils/locationUtils";
 import { normalizeListing } from "../utils/listingUtils";
@@ -15,6 +16,7 @@ const defaultFormState = {
   beds: "",
   baths: "",
   propertyType: "apartment",
+  roommateType: "entire_place",
   available_from: "",
   available_to: "",
   landlordNum: "",
@@ -45,6 +47,7 @@ const defaultLocationState = {
  */
 export default function AddListingForm({ onCreated }) {
   const { session } = useAuth();
+  const { profile } = useProfile();
   const [formData, setFormData] = useState({
     ...defaultFormState,
     amenities: { ...defaultFormState.amenities },
@@ -55,6 +58,14 @@ export default function AddListingForm({ onCreated }) {
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const today = getTodayDateString();
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      landlordNum: prev.landlordNum || profile.phone || "",
+      landlordEmail: prev.landlordEmail || profile.email || "",
+    }));
+  }, [profile.email, profile.phone]);
 
   useEffect(() => {
     const trimmedAddress = formData.address.trim();
@@ -258,19 +269,6 @@ export default function AddListingForm({ onCreated }) {
       return;
     }
 
-    const contactLines = [];
-    if (formData.landlordNum.trim()) {
-      contactLines.push(`Phone: ${formData.landlordNum.trim()}`);
-    }
-    if (formData.landlordEmail.trim()) {
-      contactLines.push(`Email: ${formData.landlordEmail.trim()}`);
-    }
-    const descriptionBase = formData.description.trim();
-    const descriptionForApi =
-      contactLines.length > 0
-        ? `${descriptionBase}${descriptionBase ? "\n\n" : ""}— Contact —\n${contactLines.join("\n")}`
-        : descriptionBase;
-
     const priceMonthly = Number(formData.price);
     const coverUrl = formData.images[0]?.url?.trim() || null;
 
@@ -285,14 +283,24 @@ export default function AddListingForm({ onCreated }) {
 
     const payload = {
       title: formData.title.trim(),
-      description: descriptionForApi || null,
+      description: formData.description.trim() || null,
+      address: formData.address.trim(),
       price_monthly: priceMonthly,
       campus_location: resolvedLocation.campus,
       beds: Number(formData.beds),
+      baths: Number(formData.baths),
       property_type: formData.propertyType,
+      roommate_type: formData.roommateType,
       distance: resolvedLocation.distance,
       image_url: coverUrl,
+      images: formData.images,
       amenities: formData.amenities,
+      available_from: formData.available_from,
+      available_to: formData.available_to,
+      contact_phone: formData.landlordNum.trim() || null,
+      contact_email: formData.landlordEmail.trim() || null,
+      latitude: resolvedLocation.latitude,
+      longitude: resolvedLocation.longitude,
       ...(accessToken ? {} : { host_id: guestHostId }),
     };
 
@@ -308,13 +316,17 @@ export default function AddListingForm({ onCreated }) {
         id: created.id,
         price: created.price ?? priceMonthly,
         beds: created.beds ?? Number(formData.beds),
+        baths: created.baths ?? Number(formData.baths),
         campus: created.campus_location ?? resolvedLocation.campus,
         distance: created.distance ?? resolvedLocation.distance,
         description: formData.description.trim(),
         landlordNum: formData.landlordNum.trim(),
         landlordEmail: formData.landlordEmail.trim(),
+        roommateType: created.roommate_type ?? formData.roommateType,
+        available_from: created.available_from ?? formData.available_from,
+        available_to: created.available_to ?? formData.available_to,
         image: created.image_url || coverUrl,
-        images: formData.images,
+        images: created.images?.length ? created.images : formData.images,
         created_at: created.created_at,
       });
 
@@ -475,6 +487,24 @@ export default function AddListingForm({ onCreated }) {
                     <option value="house">House</option>
                     <option value="studio">Studio</option>
                     <option value="townhome">Townhome</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-6 grid gap-6 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Sublet format
+                  </span>
+                  <select
+                    name="roommateType"
+                    value={formData.roommateType}
+                    onChange={handleChange}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-lg text-slate-900 outline-none ring-red-200 focus:ring"
+                  >
+                    <option value="entire_place">Entire place</option>
+                    <option value="private_room">Private room</option>
+                    <option value="shared_room">Shared room</option>
                   </select>
                 </label>
               </div>
@@ -646,7 +676,6 @@ export default function AddListingForm({ onCreated }) {
                   Phone number
                 </span>
                 <input
-                  required
                   type="tel"
                   name="landlordNum"
                   value={formData.landlordNum}
@@ -661,7 +690,6 @@ export default function AddListingForm({ onCreated }) {
                   Email address
                 </span>
                 <input
-                  required
                   type="email"
                   name="landlordEmail"
                   value={formData.landlordEmail}

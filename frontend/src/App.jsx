@@ -6,6 +6,9 @@ import RootLayout from "./components/RootLayout";
 import FavoritesPage from "./pages/FavoritesPage";
 import LoginPage from "./pages/LoginPage";
 import AddListingPage from "./pages/AddListingPage";
+import ProfilePage from "./pages/ProfilePage";
+import DashboardPage from "./pages/DashboardPage";
+import AdminImportPage from "./pages/AdminImportPage";
 
 const router = createBrowserRouter([
   {
@@ -24,6 +27,18 @@ const router = createBrowserRouter([
       {
         path: "login",
         element: <LoginPage />,
+      },
+      {
+        path: "profile",
+        element: <ProfilePage />,
+      },
+      {
+        path: "dashboard",
+        element: <DashboardPage />,
+      },
+      {
+        path: "admin/import",
+        element: <AdminImportPage />,
       },
       {
         path: "listings/new",

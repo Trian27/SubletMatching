@@ -83,6 +83,7 @@ function FilterSidebar({ filters, setFilters }) {
             <option value="all">All Types</option>
             <option value="apartment">Apartment</option>
             <option value="house">House</option>
+            <option value="room">Room</option>
             <option value="studio">Studio</option>
             <option value="townhome">Townhome</option>
           </select>

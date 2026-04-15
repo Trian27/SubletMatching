@@ -1,9 +1,11 @@
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
+import { useProfile } from "../context/ProfileContext";
 
 function Navbar() {
   const { user, isConfigured } = useAuth();
+  const { profile, hasCompletedProfile } = useProfile();
 
   const linkClass = ({ isActive }) =>
     `px-3 py-2 text-sm font-medium transition-colors ${
@@ -36,18 +38,45 @@ function Navbar() {
           <NavLink to="/favorites" className={linkClass}>
             Favorites
           </NavLink>
+          {user && (
+            <>
+              <NavLink to="/dashboard" className={linkClass}>
+                Dashboard
+              </NavLink>
+              <NavLink to="/profile" className={linkClass}>
+                Profile
+              </NavLink>
+            </>
+          )}
         </div>
 
-        <Link
-          to="/"
-          className="text-lg font-semibold text-slate-900"
-        >
-          Sublet Finder
-        </Link>
+        <div className="flex items-center gap-4">
+          {user && !hasCompletedProfile && (
+            <Link
+              to="/profile"
+              className="rounded-full bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
+            >
+              Complete profile
+            </Link>
+          )}
+          {Boolean(profile?.is_admin) && (
+            <Link
+              to="/admin/import"
+              className="rounded-full border border-red-200 px-4 py-2 text-sm font-medium text-red-700"
+            >
+              Import
+            </Link>
+          )}
+          <Link
+            to="/"
+            className="text-lg font-semibold text-slate-900"
+          >
+            Sublet Finder
+          </Link>
+        </div>
       </div>
     </nav>
   );
 }
 
 export default Navbar;
-

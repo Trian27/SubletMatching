@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 import ErrorPage from "./ErrorPage";
 import CardDescription from "../components/CardDescription";
 import Sidebar from "../components/Sidebar";
@@ -7,8 +8,29 @@ import { useListings } from "../context/ListingsContext";
 
 const CardInfo = () => {
     const params = useParams();
-    const { getListingById } = useListings();
-    const foundListing = getListingById(params.listingId);
+    const { getListingById, fetchListingById } = useListings();
+    const [asyncListing, setAsyncListing] = useState(null);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const foundListing = getListingById(params.listingId) || asyncListing;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetchListingById(params.listingId)
+      .then((listing) => {
+        if (isMounted) {
+          setAsyncListing(listing);
+          setLoadFailed(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) setLoadFailed(true);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchListingById, params.listingId]);
 
   if (foundListing) {
     return (
@@ -29,6 +51,14 @@ const CardInfo = () => {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!loadFailed) {
+    return (
+      <div className="mx-auto max-w-[1600px] px-6 py-10 text-slate-600">
+        Loading listing...
       </div>
     );
   }

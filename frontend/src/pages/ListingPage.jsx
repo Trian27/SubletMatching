@@ -7,7 +7,7 @@ import { useFavorites } from "../context/FavoritesContext";
 import { useListings } from "../context/ListingsContext";
 
 function ListingPage() {
-  const { listings } = useListings();
+  const { listings, isLoading, errorMessage, source } = useListings();
   const { favorites, toggleFavorite } = useFavorites();
   const [filters, setFilters] = useState({
     price: [0, 5000],
@@ -31,6 +31,13 @@ function ListingPage() {
               <h1 className="text-3xl font-semibold text-slate-900">
                 Showing {filteredListings.length} listings
               </h1>
+              <p className="mt-2 text-sm text-slate-500">
+                {isLoading
+                  ? "Loading live marketplace listings..."
+                  : source === "api"
+                    ? "Live inventory from the backend marketplace."
+                    : "Showing fallback listings while the backend is unavailable."}
+              </p>
             </div>
 
             <Link
@@ -53,6 +60,12 @@ function ListingPage() {
               </svg>
             </Link>
           </div>
+
+          {errorMessage && (
+            <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {errorMessage}
+            </div>
+          )}
 
           <ListingGrid
             listings={filteredListings}

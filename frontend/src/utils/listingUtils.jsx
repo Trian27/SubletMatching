@@ -10,39 +10,50 @@ export function normalizeListing(listing) {
   if (!listing) return null;
 
   const amenities = listing.amenities ?? {};
+  const campus = listing.campus ?? listing.campus_location ?? "";
+  const landlordNum = listing.landlordNum ?? listing.contact_phone ?? "";
+  const landlordEmail = listing.landlordEmail ?? listing.contact_email ?? "";
   const rawImages =
     Array.isArray(listing.images) && listing.images.length > 0
       ? listing.images
-      : [listing.image].filter(Boolean);
+      : [listing.image, listing.image_url].filter(Boolean);
   const beds = toNumber(listing.beds ?? listing.bedrooms, 0);
   const baths = toNumber(listing.baths ?? listing.bathrooms, 0);
   const images = rawImages
     .map((image, index) => normalizeImageEntry(image, index))
     .filter(Boolean);
-  const primaryImage = images[0]?.url || listing.image?.trim() || DEFAULT_LISTING_IMAGE;
+  const primaryImage =
+    images[0]?.url ||
+    listing.image?.trim() ||
+    listing.image_url?.trim() ||
+    DEFAULT_LISTING_IMAGE;
 
   return {
     ...listing,
     id: listing.id,
     title: listing.title?.trim() || "Untitled listing",
     address: listing.address?.trim() || "",
-    campus: listing.campus?.trim() || "",
-    price: toNumber(listing.price, 0),
+    campus: campus?.trim() || "",
+    campus_location: campus?.trim() || "",
+    price: toNumber(listing.price ?? listing.price_monthly, 0),
     beds,
     bedrooms: beds,
     baths,
     bathrooms: baths,
-    propertyType: (listing.propertyType || "apartment").toLowerCase(),
+    propertyType: (listing.propertyType || listing.property_type || "apartment").toLowerCase(),
+    roommateType: (listing.roommateType || listing.roommate_type || "").toLowerCase(),
     distance: toNumber(listing.distance, 0),
     description: listing.description?.trim() || "No description has been added for this listing yet.",
-    landlordNum: listing.landlordNum?.trim() || "",
-    landlordEmail: listing.landlordEmail?.trim() || "",
+    landlordNum: landlordNum?.trim() || "",
+    landlordEmail: landlordEmail?.trim() || "",
     available_from: listing.available_from || "",
     available_to: listing.available_to || "",
     latitude: listing.latitude ? toNumber(listing.latitude) : null,
     longitude: listing.longitude ? toNumber(listing.longitude) : null,
     images,
     image: primaryImage,
+    image_url: primaryImage,
+    source: listing.source || "user_posted",
     amenities: {
       Parking: Boolean(amenities.Parking ?? amenities.parking),
       Laundry: Boolean(amenities.Laundry ?? amenities.laundry),

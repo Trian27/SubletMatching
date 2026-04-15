@@ -2,6 +2,8 @@ import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import listingsRouter from './routes/listings.js'
+import profilesRouter from './routes/profiles.js'
+import inquiriesRouter from './routes/inquiries.js'
 
 dotenv.config()
 
@@ -29,6 +31,8 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.use('/listings', listingsRouter)
+app.use('/profiles', profilesRouter)
+app.use('/inquiries', inquiriesRouter)
 
 // Start server
 app.listen(PORT, () => {

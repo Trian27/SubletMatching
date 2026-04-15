@@ -1,64 +1,102 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import listingsData from "../data/listings";
-import { getNextListingId, normalizeListing, normalizeListings } from "../utils/listingUtils";
+import { getListingById as fetchListing, getListings } from "../api/listingsApi";
+import { normalizeListing, normalizeListings } from "../utils/listingUtils";
 
 const ListingsContext = createContext(null);
-const STORAGE_KEY = "sublet_user_listings";
-
-function loadUserListingsFromStorage() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const parsed = JSON.parse(stored);
-    return normalizeListings(Array.isArray(parsed) ? parsed : []);
-  } catch (error) {
-    console.warn("Could not load listings from localStorage", error);
-    return [];
-  }
-}
 
 export function ListingsProvider({ children }) {
-  const baseListings = useMemo(() => normalizeListings(listingsData), []);
-  const [userListings, setUserListings] = useState(loadUserListingsFromStorage);
+  const fallbackListings = useMemo(() => normalizeListings(listingsData), []);
+  const [listings, setListings] = useState(fallbackListings);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [source, setSource] = useState("fallback");
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userListings));
-    } catch (error) {
-      console.warn("Could not save listings to localStorage", error);
-    }
-  }, [userListings]);
+    let isMounted = true;
 
-  const listings = useMemo(
-    () => [...userListings, ...baseListings],
-    [baseListings, userListings]
+    async function loadListings() {
+      setIsLoading(true);
+      setErrorMessage("");
+
+      try {
+        const data = await getListings();
+        if (!isMounted) return;
+        setListings(normalizeListings(data));
+        setSource("api");
+      } catch (error) {
+        if (!isMounted) return;
+        setListings(fallbackListings);
+        setSource("fallback");
+        setErrorMessage(
+          error.message || "Showing fallback listings while the API is unavailable."
+        );
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    loadListings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackListings]);
+
+  const addListing = useCallback((listingInput) => {
+    setListings((prev) => [normalizeListing(listingInput), ...prev]);
+    setSource((prev) => (prev === "api" ? prev : "mixed"));
+  }, []);
+
+  const getListingById = useCallback(
+    (id) => listings.find((listing) => String(listing.id) === String(id)) ?? null,
+    [listings]
   );
 
-  const addListing = (listingInput) => {
-    setUserListings((prev) => {
-      const nextListing = normalizeListing({
-        ...listingInput,
-        id:
-          listingInput.id != null && listingInput.id !== ""
-            ? listingInput.id
-            : getNextListingId([...baseListings, ...prev]),
-      });
+  const refreshListings = useCallback(async () => {
+    const data = await getListings();
+    setListings(normalizeListings(data));
+    setSource("api");
+    setErrorMessage("");
+  }, []);
 
-      return [nextListing, ...prev];
+  const fetchListingById = useCallback(async (id) => {
+    const existing = getListingById(id);
+    if (existing) return existing;
+
+    const data = await fetchListing(id);
+    const normalized = normalizeListing(data);
+    setListings((prev) => {
+      if (prev.some((listing) => String(listing.id) === String(normalized.id))) {
+        return prev;
+      }
+      return [normalized, ...prev];
     });
-  };
+    return normalized;
+  }, [getListingById]);
 
-  const getListingById = (id) =>
-    listings.find((listing) => String(listing.id) === String(id)) ?? null;
-
-  const value = {
-    listings,
-    addListing,
-    getListingById,
-  };
+  const value = useMemo(
+    () => ({
+      listings,
+      isLoading,
+      errorMessage,
+      source,
+      addListing,
+      getListingById,
+      fetchListingById,
+      refreshListings,
+    }),
+    [
+      addListing,
+      errorMessage,
+      fetchListingById,
+      getListingById,
+      isLoading,
+      listings,
+      refreshListings,
+      source,
+    ]
+  );
 
   return <ListingsContext.Provider value={value}>{children}</ListingsContext.Provider>;
 }

@@ -1,10 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
 import AddListingForm from "../components/AddListingForm";
 import { useListings } from "../context/ListingsContext";
+import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 
 function AddListingPage() {
   const navigate = useNavigate();
   const { addListing } = useListings();
+  const { user } = useAuth();
+  const { hasCompletedProfile } = useProfile();
 
   return (
     <div className="mx-auto max-w-[1800px] px-6 py-10">
@@ -23,6 +27,18 @@ function AddListingPage() {
           Cancel
         </Link>
       </div>
+
+      {!user && (
+        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+          Sign in first to publish a listing.
+        </div>
+      )}
+
+      {user && !hasCompletedProfile && (
+        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-800">
+          Your profile is missing a name or Rutgers affiliation. You can still test posting, but complete your profile for a cleaner host flow.
+        </div>
+      )}
 
       <AddListingForm
         onCreated={(listing) => {
