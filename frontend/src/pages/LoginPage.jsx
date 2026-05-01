@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 
@@ -133,6 +133,14 @@ function LoginPage() {
             ? "Need an account? Create one"
             : "Already have an account? Sign in"}
         </button>
+
+        {mode === "signin" && (
+          <p className="mt-4 text-center text-sm">
+            <Link to="/auth/forgot-password" className="font-medium text-red-600 hover:text-red-700">
+              Forgot password?
+            </Link>
+          </p>
+        )}
       </form>
     </div>
   );

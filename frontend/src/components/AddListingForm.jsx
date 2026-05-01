@@ -306,6 +306,7 @@ export default function AddListingForm({ onCreated }) {
         title: formData.title.trim(),
         address: formData.address.trim(),
         id: created.id,
+        host_id: created.host_id,
         price: created.price ?? priceMonthly,
         beds: created.beds ?? Number(formData.beds),
         campus: created.campus_location ?? resolvedLocation.campus,

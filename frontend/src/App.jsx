@@ -6,6 +6,8 @@ import RootLayout from "./components/RootLayout";
 import FavoritesPage from "./pages/FavoritesPage";
 import LoginPage from "./pages/LoginPage";
 import AddListingPage from "./pages/AddListingPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const router = createBrowserRouter([
   {
@@ -24,6 +26,14 @@ const router = createBrowserRouter([
       {
         path: "login",
         element: <LoginPage />,
+      },
+      {
+        path: "auth/forgot-password",
+        element: <ForgotPasswordPage />,
+      },
+      {
+        path: "auth/reset-password",
+        element: <ResetPasswordPage />,
       },
       {
         path: "listings/new",

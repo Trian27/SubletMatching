@@ -49,7 +49,22 @@ router.get('/', async (req, res) => {
     const { data, error } = await query
 
     if (error) {
-      return res.status(400).json({ error: error.message })
+      console.error('GET /listings Supabase error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        status: error.status,
+        name: error.name,
+        cause: error.cause,
+      })
+      return res.status(400).json({
+        error: error.message,
+        code: error.code,
+        status: error.status,
+        hint: error.hint,
+        details: error.details,
+      })
     }
 
     // Map database columns to frontend expected format
@@ -70,7 +85,17 @@ router.get('/', async (req, res) => {
 
     res.json(mappedData)
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('GET /listings unexpected error:', {
+      message: err?.message,
+      name: err?.name,
+      cause: err?.cause,
+      stack: err?.stack,
+    })
+    res.status(500).json({
+      error: err?.message || 'Internal server error',
+      name: err?.name,
+      cause: err?.cause,
+    })
   }
 })
 
