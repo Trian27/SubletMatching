@@ -13,6 +13,13 @@ function ListingPage() {
     price: [0, 5000],
     beds: "any",
     propertyType: "all",
+    campus: "all",
+    amenities: {
+      Parking: false,
+      Laundry: false,
+      Pet_Friendly: false,
+      Furnished: false,
+    },
   });
 
   const filteredListings = useMemo(() => {

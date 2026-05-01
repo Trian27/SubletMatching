@@ -33,11 +33,36 @@ function FilterSidebar({ filters, setFilters }) {
     }));
   };
 
+  const handleCampusChange = (e) => {
+    setFilters((prev) => ({
+      ...prev,
+      campus: e.target.value,
+    }));
+  };
+
+  const handleAmenityChange = (e) => {
+    const { name, checked } = e.target;
+    setFilters((prev) => ({
+      ...prev,
+      amenities: {
+        ...prev.amenities,
+        [name]: checked,
+      },
+    }));
+  };
+
   const resetFilters = () => {
     setFilters({
       price: [0, 5000],
       beds: "any",
       propertyType: "all",
+      campus: "all",
+      amenities: {
+        Parking: false,
+        Laundry: false,
+        Pet_Friendly: false,
+        Furnished: false,
+      },
     });
   };
 
@@ -73,6 +98,23 @@ function FilterSidebar({ filters, setFilters }) {
 
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-700">
+            Campus preferred
+          </label>
+          <select
+            value={filters.campus}
+            onChange={handleCampusChange}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-red-500"
+          >
+            <option value="all">Any campus</option>
+            <option value="College Ave">College Ave</option>
+            <option value="Busch">Busch</option>
+            <option value="Livingston">Livingston</option>
+            <option value="Cook/Douglass">Cook/Douglass</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-slate-700">
             Property Type
           </label>
           <select
@@ -86,6 +128,26 @@ function FilterSidebar({ filters, setFilters }) {
             <option value="studio">Studio</option>
             <option value="townhome">Townhome</option>
           </select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-sm font-medium text-slate-700">
+            Amenities
+          </label>
+          <div className="grid gap-2">
+            {Object.entries(filters.amenities).map(([key, checked]) => (
+              <label key={key} className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name={key}
+                  checked={checked}
+                  onChange={handleAmenityChange}
+                  className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                />
+                {key.replaceAll("_", " ")}
+              </label>
+            ))}
+          </div>
         </div>
 
         <div>

@@ -4,19 +4,40 @@ import CardDescription from "../components/CardDescription";
 import Sidebar from "../components/Sidebar";
 import ListingImageGallery from "../components/ListingImageGallery";
 import { useListings } from "../context/ListingsContext";
+import { useAuth } from "../context/AuthContext";
+import { deleteListing, updateListing } from "../api/listingsApi";
 
 const CardInfo = () => {
-    const params = useParams();
-    const { getListingById, isLoading } = useListings();
-    const foundListing = getListingById(params.listingId);
+  const params = useParams();
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const { getListingById, updateListing: updateListingInState, removeListing } =
+    useListings();
+  const foundListing = getListingById(params.listingId);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState("");
 
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-[1600px] px-6 py-10 text-slate-600">
-        Loading listing details...
-      </div>
-    );
-  }
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+
+  const accessToken = session?.access_token ?? null;
+
+  const isOwner =
+    Boolean(session?.user?.id) &&
+    Boolean(foundListing?.host_id) &&
+    String(session.user.id) === String(foundListing.host_id);
+  const canShowActions = Boolean(accessToken) && isOwner;
+
+  const initialEditValues = useMemo(() => {
+    if (!foundListing) return null;
+    return {
+      title: foundListing.title ?? "",
+      price: String(foundListing.price ?? ""),
+      description: foundListing.description ?? "",
+    };
+  }, [foundListing]);
 
   if (foundListing) {
     return (

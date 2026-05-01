@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { MAX_LISTING_IMAGES, filesToListingImages } from "../utils/imageUtils";
 import { geocodeAddressToNearestCampus } from "../utils/locationUtils";
 import { normalizeListing } from "../utils/listingUtils";
+import { addOwnedListingId } from "../utils/listingOwnershipCache";
 
 const defaultFormState = {
   title: "",
@@ -252,6 +253,12 @@ export default function AddListingForm({ onCreated }) {
       return;
     }
 
+    if (!session?.user?.id) {
+      setSubmitError("Sign in required to create a listing.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const resolvedLocation = await ensureResolvedLocation();
     if (!resolvedLocation) {
       setIsSubmitting(false);
@@ -321,8 +328,10 @@ export default function AddListingForm({ onCreated }) {
         image: created.image_url || coverUrl,
         images: formData.images,
         created_at: created.created_at,
+        host_id: created.host_id ?? session.user.id,
       });
 
+      addOwnedListingId(session.user.id, created.id);
       onCreated?.(merged);
     } catch (err) {
       const msg =
