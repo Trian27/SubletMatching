@@ -21,6 +21,22 @@ export default function applyFilters(listings, filters) {
       return false;
     }
 
+    if (filters.campus && filters.campus !== "all") {
+      const listingCampus = (listing.campus || "").trim();
+      if (listingCampus !== filters.campus) return false;
+    }
+
+    const selectedAmenities = Object.entries(filters.amenities || {})
+      .filter(([, selected]) => selected)
+      .map(([name]) => name);
+
+    if (selectedAmenities.length > 0) {
+      const listingAmenities = listing.amenities || {};
+      for (const amenity of selectedAmenities) {
+        if (!listingAmenities[amenity]) return false;
+      }
+    }
+
     return true;
   });
 }

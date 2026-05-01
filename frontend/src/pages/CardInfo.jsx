@@ -7,6 +7,7 @@ import ListingImageGallery from "../components/ListingImageGallery";
 import { useListings } from "../context/ListingsContext";
 import { useAuth } from "../context/AuthContext";
 import { deleteListing, updateListing } from "../api/listingsApi";
+import { isListingOwnedByUser } from "../utils/listingOwnershipCache";
 
 const CardInfo = () => {
   const params = useParams();
@@ -18,27 +19,59 @@ const CardInfo = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [actionError, setActionError] = useState("");
-
-  const [editTitle, setEditTitle] = useState("");
-  const [editPrice, setEditPrice] = useState("");
-  const [editDescription, setEditDescription] = useState("");
+  const [editFormData, setEditFormData] = useState(null);
 
   const accessToken = session?.access_token ?? null;
 
   const isOwner =
     Boolean(session?.user?.id) &&
-    Boolean(foundListing?.host_id) &&
-    String(session.user.id) === String(foundListing.host_id);
+    (String(session.user.id) === String(foundListing?.host_id) ||
+      isListingOwnedByUser(foundListing?.id, session.user.id));
   const canShowActions = Boolean(accessToken) && isOwner;
 
   const initialEditValues = useMemo(() => {
     if (!foundListing) return null;
     return {
       title: foundListing.title ?? "",
+      address: foundListing.address ?? "",
       price: String(foundListing.price ?? ""),
+      beds: String(foundListing.beds ?? ""),
+      baths: String(foundListing.baths ?? ""),
+      propertyType: foundListing.propertyType ?? "apartment",
+      available_from: foundListing.available_from ?? "",
+      available_to: foundListing.available_to ?? "",
+      landlordNum: foundListing.landlordNum ?? "",
+      landlordEmail: foundListing.landlordEmail ?? "",
       description: foundListing.description ?? "",
+      campus: foundListing.campus ?? "",
+      distance: String(foundListing.distance ?? ""),
+      amenities: {
+        Parking: Boolean(foundListing.amenities?.Parking),
+        Laundry: Boolean(foundListing.amenities?.Laundry),
+        Pet_Friendly: Boolean(foundListing.amenities?.Pet_Friendly),
+        Furnished: Boolean(foundListing.amenities?.Furnished),
+      },
     };
   }, [foundListing]);
+
+  const handleEditFieldChange = (event) => {
+    const { name, value } = event.target;
+    setEditFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleEditAmenityChange = (event) => {
+    const { name, checked } = event.target;
+    setEditFormData((prev) => ({
+      ...prev,
+      amenities: {
+        ...prev.amenities,
+        [name]: checked,
+      },
+    }));
+  };
 
   if (foundListing) {
     return (
@@ -56,13 +89,17 @@ const CardInfo = () => {
                     type="button"
                     onClick={() => {
                       setActionError("");
+                      if (isEditing) {
+                        setEditFormData(null);
+                        setIsEditing(false);
+                        return;
+                      }
+
                       const init = initialEditValues;
                       if (init) {
-                        setEditTitle(init.title);
-                        setEditPrice(init.price);
-                        setEditDescription(init.description);
+                        setEditFormData(init);
                       }
-                      setIsEditing((prev) => !prev);
+                      setIsEditing(true);
                     }}
                     className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
                   >
@@ -99,7 +136,7 @@ const CardInfo = () => {
               </p>
             )}
 
-            {canShowActions && isEditing && (
+{canShowActions && isEditing && editFormData && (
               <form
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                 onSubmit={async (event) => {
@@ -107,27 +144,51 @@ const CardInfo = () => {
                   setActionError("");
                   setIsSaving(true);
                   try {
-                    const nextTitle = editTitle.trim();
-                    const nextPriceMonthly = Number(editPrice);
-                    const nextDescription = editDescription.trim();
+                    const nextTitle = editFormData.title.trim();
+                    const nextPriceMonthly = Number(editFormData.price);
+                    const nextBeds = Number(editFormData.beds);
+                    const nextBaths = Number(editFormData.baths);
+                    const nextCampus = editFormData.campus.trim();
+                    const nextDistance = Number(editFormData.distance);
+                    const nextDescription = editFormData.description.trim();
+                    const nextAmenities = editFormData.amenities;
+
+                    const payload = {
+                      title: nextTitle,
+                      description: nextDescription || null,
+                      price_monthly: nextPriceMonthly,
+                      beds: nextBeds,
+                      property_type: editFormData.propertyType,
+                      campus_location: nextCampus || null,
+                      distance: Number.isFinite(nextDistance) ? nextDistance : null,
+                      amenities: nextAmenities,
+                    };
 
                     const updated = await updateListing(
                       foundListing.id,
-                      {
-                        title: nextTitle,
-                        price_monthly: nextPriceMonthly,
-                        description: nextDescription,
-                      },
+                      payload,
                       { accessToken }
                     );
 
                     updateListingInState(foundListing.id, {
                       title: updated.title ?? nextTitle,
                       price: updated.price ?? nextPriceMonthly,
+                      beds: updated.beds ?? nextBeds,
+                      baths: nextBaths,
+                      propertyType: updated.propertyType ?? editFormData.propertyType,
+                      campus: updated.campus_location ?? nextCampus,
+                      distance: updated.distance ?? nextDistance,
+                      amenities: updated.amenities ?? nextAmenities,
                       description: updated.description ?? nextDescription,
+                      address: editFormData.address.trim(),
+                      available_from: editFormData.available_from,
+                      available_to: editFormData.available_to,
+                      landlordNum: editFormData.landlordNum.trim(),
+                      landlordEmail: editFormData.landlordEmail.trim(),
                     });
 
                     setIsEditing(false);
+                    setEditFormData(null);
                   } catch (err) {
                     setActionError(err.message || "Could not update listing.");
                   } finally {
@@ -142,8 +203,9 @@ const CardInfo = () => {
                     </span>
                     <input
                       required
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
+                      name="title"
+                      value={editFormData.title}
+                      onChange={handleEditFieldChange}
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
                     />
                   </label>
@@ -156,11 +218,189 @@ const CardInfo = () => {
                       required
                       min="1"
                       type="number"
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(e.target.value)}
+                      name="price"
+                      value={editFormData.price}
+                      onChange={handleEditFieldChange}
                       className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
                     />
                   </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Address
+                    </span>
+                    <input
+                      required
+                      name="address"
+                      value={editFormData.address}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Campus
+                    </span>
+                    <select
+                      name="campus"
+                      value={editFormData.campus}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    >
+                      <option value="">Select campus</option>
+                      <option value="College Ave">College Ave</option>
+                      <option value="Busch">Busch</option>
+                      <option value="Livingston">Livingston</option>
+                      <option value="Cook/Douglass">Cook/Douglass</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Property type
+                    </span>
+                    <select
+                      name="propertyType"
+                      value={editFormData.propertyType}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    >
+                      <option value="apartment">Apartment</option>
+                      <option value="house">House</option>
+                      <option value="studio">Studio</option>
+                      <option value="townhome">Townhome</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Bedrooms
+                    </span>
+                    <input
+                      required
+                      min="0"
+                      type="number"
+                      name="beds"
+                      value={editFormData.beds}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Bathrooms
+                    </span>
+                    <input
+                      required
+                      min="0"
+                      step="0.5"
+                      type="number"
+                      name="baths"
+                      value={editFormData.baths}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Distance (miles)
+                    </span>
+                    <input
+                      min="0"
+                      step="0.1"
+                      type="number"
+                      name="distance"
+                      value={editFormData.distance}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Available from
+                    </span>
+                    <input
+                      type="date"
+                      name="available_from"
+                      value={editFormData.available_from}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Available to
+                    </span>
+                    <input
+                      type="date"
+                      name="available_to"
+                      value={editFormData.available_to}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Phone
+                    </span>
+                    <input
+                      type="tel"
+                      name="landlordNum"
+                      value={editFormData.landlordNum}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      name="landlordEmail"
+                      value={editFormData.landlordEmail}
+                      onChange={handleEditFieldChange}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
+                    />
+                  </label>
+                </div>
+
+                <div className="mb-4">
+                  <p className="mb-2 text-sm font-medium text-slate-700">Amenities</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {Object.entries(editFormData.amenities).map(([key, checked]) => (
+                      <label
+                        key={key}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                      >
+                        <input
+                          type="checkbox"
+                          name={key}
+                          checked={checked}
+                          onChange={handleEditAmenityChange}
+                          className="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
+                        />
+                        {key.replaceAll("_", " ")}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <label className="mt-4 block">
@@ -169,8 +409,9 @@ const CardInfo = () => {
                   </span>
                   <textarea
                     rows={4}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
+                    name="description"
+                    value={editFormData.description}
+                    onChange={handleEditFieldChange}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
                   />
                 </label>

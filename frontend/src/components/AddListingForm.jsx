@@ -7,6 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { MAX_LISTING_IMAGES, filesToListingImages } from "../utils/imageUtils";
 import { geocodeAddressToNearestCampus } from "../utils/locationUtils";
 import { normalizeListing } from "../utils/listingUtils";
+import { addOwnedListingId } from "../utils/listingOwnershipCache";
 
 const defaultFormState = {
   title: "",
@@ -252,6 +253,12 @@ export default function AddListingForm({ onCreated }) {
       return;
     }
 
+    if (!session?.user?.id) {
+      setSubmitError("Sign in required to create a listing.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const resolvedLocation = await ensureResolvedLocation();
     if (!resolvedLocation) {
       setIsSubmitting(false);
@@ -277,11 +284,6 @@ export default function AddListingForm({ onCreated }) {
     // Prefer the live session token; fallback to localStorage for backwards compatibility.
     const accessToken =
       session?.access_token ?? getListingsAccessToken();
-    /** Backend ignores body host_id when Supabase JWT is valid; UUID helps Postgres `uuid` columns in dev. */
-    const guestHostId =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : "00000000-0000-0000-0000-000000000001";
 
     const payload = {
       title: formData.title.trim(),
@@ -293,7 +295,6 @@ export default function AddListingForm({ onCreated }) {
       distance: resolvedLocation.distance,
       image_url: coverUrl,
       amenities: formData.amenities,
-      ...(accessToken ? {} : { host_id: guestHostId }),
     };
 
     try {
@@ -316,8 +317,10 @@ export default function AddListingForm({ onCreated }) {
         image: created.image_url || coverUrl,
         images: formData.images,
         created_at: created.created_at,
+        host_id: created.host_id ?? session.user.id,
       });
 
+      addOwnedListingId(session.user.id, created.id);
       onCreated?.(merged);
     } catch (err) {
       const msg =
