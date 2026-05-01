@@ -1,50 +1,48 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import listingsData from "../data/listings";
+import { getListingsApiBase } from "../api/listingsApi";
 import { getNextListingId, normalizeListing, normalizeListings } from "../utils/listingUtils";
 
 const ListingsContext = createContext(null);
-const STORAGE_KEY = "sublet_user_listings";
-
-function loadUserListingsFromStorage() {
-  if (typeof window === "undefined") return [];
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) return [];
-
-    const parsed = JSON.parse(stored);
-    return normalizeListings(Array.isArray(parsed) ? parsed : []);
-  } catch (error) {
-    console.warn("Could not load listings from localStorage", error);
-    return [];
-  }
-}
 
 export function ListingsProvider({ children }) {
-  const baseListings = useMemo(() => normalizeListings(listingsData), []);
-  const [userListings, setUserListings] = useState(loadUserListingsFromStorage);
+  const [listings, setListings] = useState([]);
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userListings));
-    } catch (error) {
-      console.warn("Could not save listings to localStorage", error);
-    }
-  }, [userListings]);
+    let cancelled = false;
 
-  const listings = useMemo(
-    () => [...userListings, ...baseListings],
-    [baseListings, userListings]
-  );
+    async function loadListings() {
+      try {
+        const response = await fetch(`${getListingsApiBase()}/listings`);
+        const data = await response.json();
+        if (!response.ok || !Array.isArray(data)) {
+          throw new Error("Failed loading listings");
+        }
+        if (!cancelled) {
+          setListings(normalizeListings(data));
+        }
+      } catch (error) {
+        console.warn("Could not load API listings, using fallback", error);
+        if (!cancelled) {
+          setListings(normalizeListings(listingsData));
+        }
+      }
+    }
+
+    void loadListings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const addListing = (listingInput) => {
-    setUserListings((prev) => {
+    setListings((prev) => {
       const nextListing = normalizeListing({
         ...listingInput,
         id:
           listingInput.id != null && listingInput.id !== ""
             ? listingInput.id
-            : getNextListingId([...baseListings, ...prev]),
+            : getNextListingId(prev),
       });
 
       return [nextListing, ...prev];

@@ -16,6 +16,7 @@ function mapListingRow(data) {
     campus_location: data.campus_location,
     description: data.description,
     image_url: data.image_url,
+    host_id: data.host_id,
     created_at: data.created_at,
   }
 }
@@ -80,6 +81,7 @@ router.get('/', async (req, res) => {
       campus_location: listing.campus_location,
       description: listing.description,
       image_url: listing.image_url,
+      host_id: listing.host_id,
       created_at: listing.created_at
     }))
 
@@ -100,7 +102,9 @@ router.get('/', async (req, res) => {
 })
 
 // GET single listing by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
+  // Let the dedicated /favorites route handle this path.
+  if (req.params.id === 'favorites') return next()
   try {
     const { data, error } = await supabase
       .from('listings')
@@ -123,6 +127,7 @@ router.get('/:id', async (req, res) => {
       campus_location: data.campus_location,
       description: data.description,
       image_url: data.image_url,
+      host_id: data.host_id,
       created_at: data.created_at
     }
     
@@ -220,18 +225,24 @@ router.post('/', requireSupabaseUser, async (req, res) => {
   }
 })
 
-// POST /favorites - Add a listing to user's favorites
-router.post('/favorites', async (req, res) => {
+// POST /favorites - Add a listing to current user's favorites
+router.post('/favorites', requireSupabaseUser, async (req, res) => {
   try {
-    const { listing_id, user_id } = req.body
+    const { listing_id } = req.body
+    const user_id = req.user?.id
 
-    // Validation: both listing_id and user_id are required
-    if (!listing_id || !user_id) {
-      return res.status(400).json({ error: 'listing_id and user_id are required' })
+    if (!listing_id) {
+      return res.status(400).json({ error: 'listing_id is required' })
     }
 
-    // Create authenticated Supabase client for RLS
-    const authenticatedSupabase = supabase
+    const accessToken =
+      req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
 
     // Insert the favorite (RLS will ensure the user can only add their own favorites)
     const { data, error } = await authenticatedSupabase
@@ -257,13 +268,18 @@ router.post('/favorites', async (req, res) => {
   }
 })
 
-// GET /favorites/:userId - Get all favorites for a user
-router.get('/favorites/:userId', async (req, res) => {
+// GET /favorites - Get current user's favorites
+router.get('/favorites', requireSupabaseUser, async (req, res) => {
   try {
-    const { userId } = req.params
+    const userId = req.user?.id
+    const accessToken =
+      req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
 
-    // Create authenticated Supabase client for RLS
-    const authenticatedSupabase = supabase
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
 
     // Get user's favorites with listing details
     const { data, error } = await authenticatedSupabase
@@ -302,16 +318,23 @@ router.get('/favorites/:userId', async (req, res) => {
   }
 })
 
-// DELETE /favorites/:id - Remove a favorite
-router.delete('/favorites/:id', async (req, res) => {
+// DELETE /favorites/:id - Remove current user's favorite
+router.delete('/favorites/:id', requireSupabaseUser, async (req, res) => {
   try {
-    // Create authenticated Supabase client for RLS
-    const authenticatedSupabase = supabase
+    const accessToken =
+      req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = isSupabaseConfigured
+      ? createSupabaseClientWithToken(accessToken)
+      : supabase
 
     const { error } = await authenticatedSupabase
       .from('favorites')
       .delete()
       .eq('id', req.params.id)
+      .eq('user_id', req.user?.id)
 
     if (error) return res.status(400).json({ error: error.message })
     res.status(204).send()

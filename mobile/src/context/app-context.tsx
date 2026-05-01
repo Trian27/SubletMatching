@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   addFavorite,
   createListing as createListingApi,
@@ -10,6 +11,8 @@ import {
 } from '@/src/api/listings';
 import { supabase } from '@/src/api/supabase';
 import { Listing } from '@/src/types/listing';
+
+const FAVORITES_STORAGE_KEY = 'sublet_favorites';
 
 type AppContextShape = {
   listings: Listing[];
@@ -38,6 +41,44 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [authMessage, setAuthMessage] = useState('');
   const previousAccessToken = useRef<string | null>(null);
+  const [favoritesHydrated, setFavoritesHydrated] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function hydrateFavorites() {
+      try {
+        const raw = await AsyncStorage.getItem(FAVORITES_STORAGE_KEY);
+        if (cancelled) return;
+        if (!raw) {
+          setFavoritesHydrated(true);
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+          setFavoritesHydrated(true);
+          return;
+        }
+        setFavoriteIds(new Set(parsed.map((id) => String(id))));
+      } catch {
+        // Ignore corrupted or unavailable local favorites cache.
+      } finally {
+        if (!cancelled) {
+          setFavoritesHydrated(true);
+        }
+      }
+    }
+
+    void hydrateFavorites();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!favoritesHydrated) return;
+    void AsyncStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favoriteIds]));
+  }, [favoriteIds, favoritesHydrated]);
 
   const refreshListings = useCallback(async () => {
     setLoading(true);
@@ -77,6 +118,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (hadToken) {
           setFavoriteIds(new Set());
         }
+        setAuthMessage('');
         return;
       }
 
@@ -107,33 +149,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           else next.add(id);
           return next;
         });
+        setAuthMessage('');
         return;
       }
 
-      if (favoriteIds.has(id)) {
-        const favoriteRowId = favoriteRowByListingId.get(id);
-        if (!favoriteRowId) return;
-        await removeFavorite(favoriteRowId, accessToken);
-        setFavoriteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        setFavoriteRowByListingId((prev) => {
-          const next = new Map(prev);
-          next.delete(id);
-          return next;
-        });
-        return;
-      }
+      try {
+        if (favoriteIds.has(id)) {
+          let favoriteRowId = favoriteRowByListingId.get(id);
+          if (!favoriteRowId) {
+            const rows = await fetchFavorites(accessToken);
+            const nextMap = new Map(rows.map((r) => [r.listing_id, r.id]));
+            setFavoriteIds(new Set(rows.map((r) => r.listing_id)));
+            setFavoriteRowByListingId(nextMap);
+            favoriteRowId = nextMap.get(id);
+          }
+          if (!favoriteRowId) return;
+          await removeFavorite(favoriteRowId, accessToken);
+          setFavoriteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          setFavoriteRowByListingId((prev) => {
+            const next = new Map(prev);
+            next.delete(id);
+            return next;
+          });
+          setAuthMessage('');
+          return;
+        }
 
-      const created = await addFavorite(id, accessToken);
-      setFavoriteIds((prev) => new Set([...prev, id]));
-      setFavoriteRowByListingId((prev) => {
-        const next = new Map(prev);
-        next.set(id, created.id);
-        return next;
-      });
+        try {
+          const created = await addFavorite(id, accessToken);
+          setFavoriteIds((prev) => new Set([...prev, id]));
+          setFavoriteRowByListingId((prev) => {
+            const next = new Map(prev);
+            next.set(id, created.id);
+            return next;
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '';
+          if (message.toLowerCase().includes('already in favorites')) {
+            const rows = await fetchFavorites(accessToken);
+            setFavoriteIds(new Set(rows.map((r) => r.listing_id)));
+            setFavoriteRowByListingId(new Map(rows.map((r) => [r.listing_id, r.id])));
+          } else {
+            throw error;
+          }
+        }
+        setAuthMessage('');
+      } catch (error) {
+        setAuthMessage(error instanceof Error ? error.message : 'Could not update favorites.');
+      }
     },
     [accessToken, favoriteIds, favoriteRowByListingId]
   );

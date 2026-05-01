@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +15,7 @@ import {
 import { useAppData } from '@/src/context/app-context';
 
 export default function ListingsScreen() {
+  const router = useRouter();
   const { listings, loading, usingFallback, favoriteIds, toggleFavorite, refreshListings, authMessage, canWriteListings } =
     useAppData();
 
@@ -55,8 +56,8 @@ export default function ListingsScreen() {
           {listings.map((listing) => {
             const isFavorited = favoriteIds.has(listing.id);
             return (
-              <Link key={listing.id} href={`/listing/${listing.id}`} asChild>
-                <Pressable style={styles.card}>
+              <View key={listing.id} style={styles.card}>
+                <Pressable onPress={() => router.push(`/listing/${listing.id}`)}>
                   <Image
                     source={{ uri: listing.image_url || 'https://images.unsplash.com/photo-1502672023488-70e25813eb80?auto=format&fit=crop&w=1200&q=80' }}
                     style={styles.cover}
@@ -66,22 +67,27 @@ export default function ListingsScreen() {
                       <Text style={styles.cardTitle} numberOfLines={1}>
                         {listing.title}
                       </Text>
-                      <Pressable
-                        onPress={() => {
-                          void toggleFavorite(listing.id);
-                        }}
-                        hitSlop={8}
-                        style={styles.favoriteChip}>
-                        <Text style={isFavorited ? styles.favoriteOn : styles.favoriteOff}>
-                          {isFavorited ? '♥' : '♡'}
-                        </Text>
-                      </Pressable>
                     </View>
                     <Text style={styles.meta}>${listing.price}/mo • {listing.beds} bed • {listing.propertyType}</Text>
                     <Text style={styles.meta}>{listing.campus_location || 'Rutgers area'} • {listing.distance} mi</Text>
                   </View>
                 </Pressable>
-              </Link>
+                <View style={styles.cardActions}>
+                  <Pressable
+                    onPress={() => {
+                      void toggleFavorite(listing.id);
+                    }}
+                    hitSlop={8}
+                    style={styles.favoriteChip}>
+                    <Text style={isFavorited ? styles.favoriteOn : styles.favoriteOff}>
+                      {isFavorited ? '♥ Saved' : '♡ Save'}
+                    </Text>
+                  </Pressable>
+                  <Pressable onPress={() => router.push(`/listing/${listing.id}`)}>
+                    <Text style={styles.viewDetails}>View details</Text>
+                  </Pressable>
+                </View>
+              </View>
             );
           })}
         </ScrollView>
@@ -117,10 +123,18 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden' },
   cover: { height: 180, width: '100%', backgroundColor: '#e2e8f0' },
   cardBody: { padding: 12, gap: 4 },
+  cardActions: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   cardTitle: { fontSize: 17, fontWeight: '600', color: '#0f172a', flex: 1 },
-  favoriteChip: { paddingHorizontal: 8, paddingVertical: 2 },
-  favoriteOn: { color: '#cc0033', fontSize: 22 },
-  favoriteOff: { color: '#64748b', fontSize: 22 },
+  favoriteChip: { paddingHorizontal: 8, paddingVertical: 6 },
+  favoriteOn: { color: '#cc0033', fontSize: 14, fontWeight: '700' },
+  favoriteOff: { color: '#64748b', fontSize: 14, fontWeight: '700' },
+  viewDetails: { color: '#334155', fontWeight: '600' },
   meta: { color: '#475569', fontSize: 13 },
 });

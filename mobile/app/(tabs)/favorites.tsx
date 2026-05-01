@@ -1,9 +1,10 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { useAppData } from '@/src/context/app-context';
 
 export default function FavoritesScreen() {
+  const router = useRouter();
   const { listings, favoriteIds, toggleFavorite, authMessage } = useAppData();
   const favorites = listings.filter((listing) => favoriteIds.has(listing.id));
 
@@ -15,8 +16,8 @@ export default function FavoritesScreen() {
         <Text style={styles.empty}>No favorites yet. Tap the heart on a listing.</Text>
       ) : (
         favorites.map((listing) => (
-          <Link key={listing.id} href={`/listing/${listing.id}`} asChild>
-            <Pressable style={styles.card}>
+          <View key={listing.id} style={styles.card}>
+            <Pressable onPress={() => router.push(`/listing/${listing.id}`)}>
               <Image
                 source={{ uri: listing.image_url || 'https://images.unsplash.com/photo-1502672023488-70e25813eb80?auto=format&fit=crop&w=1200&q=80' }}
                 style={styles.cover}
@@ -24,15 +25,20 @@ export default function FavoritesScreen() {
               <View style={styles.body}>
                 <Text style={styles.name} numberOfLines={1}>{listing.title}</Text>
                 <Text style={styles.meta}>${listing.price}/mo • {listing.campus_location || 'Rutgers area'}</Text>
-                <Pressable
-                  onPress={() => {
-                    void toggleFavorite(listing.id);
-                  }}>
-                  <Text style={styles.remove}>Remove from favorites</Text>
-                </Pressable>
               </View>
             </Pressable>
-          </Link>
+            <View style={styles.actions}>
+              <Pressable
+                onPress={() => {
+                  void toggleFavorite(listing.id);
+                }}>
+                <Text style={styles.remove}>Remove from favorites</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push(`/listing/${listing.id}`)}>
+                <Text style={styles.view}>View details</Text>
+              </Pressable>
+            </View>
+          </View>
         ))
       )}
     </ScrollView>
@@ -47,7 +53,15 @@ const styles = StyleSheet.create({
   card: { borderRadius: 16, backgroundColor: '#fff', overflow: 'hidden' },
   cover: { height: 140, width: '100%' },
   body: { padding: 12, gap: 4 },
+  actions: {
+    paddingHorizontal: 12,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   name: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
   meta: { fontSize: 13, color: '#475569' },
   remove: { marginTop: 6, color: '#cc0033', fontWeight: '600' },
+  view: { marginTop: 6, color: '#334155', fontWeight: '600' },
 });
