@@ -8,6 +8,8 @@ import LoginPage from "./pages/LoginPage";
 import AddListingPage from "./pages/AddListingPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import InboxPage from "./pages/InboxPage";
+import ConversationPage from "./pages/ConversationPage";
 
 const router = createBrowserRouter([
   {
@@ -22,6 +24,14 @@ const router = createBrowserRouter([
       {
         path: "favorites",
         element: <FavoritesPage />,
+      },
+      {
+        path: "inbox",
+        element: <InboxPage />,
+      },
+      {
+        path: "inbox/:conversationId",
+        element: <ConversationPage />,
       },
       {
         path: "login",

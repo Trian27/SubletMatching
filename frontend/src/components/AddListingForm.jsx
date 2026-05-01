@@ -277,23 +277,27 @@ export default function AddListingForm({ onCreated }) {
     // Prefer the live session token; fallback to localStorage for backwards compatibility.
     const accessToken =
       session?.access_token ?? getListingsAccessToken();
-    /** Backend ignores body host_id when Supabase JWT is valid; UUID helps Postgres `uuid` columns in dev. */
-    const guestHostId =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : "00000000-0000-0000-0000-000000000001";
 
     const payload = {
       title: formData.title.trim(),
       description: descriptionForApi || null,
+      address: formData.address.trim(),
       price_monthly: priceMonthly,
+      price_label: `$${priceMonthly}`,
       campus_location: resolvedLocation.campus,
       beds: Number(formData.beds),
+      baths: Number(formData.baths),
       property_type: formData.propertyType,
       distance: resolvedLocation.distance,
       image_url: coverUrl,
+      images: formData.images,
       amenities: formData.amenities,
-      ...(accessToken ? {} : { host_id: guestHostId }),
+      available_from: formData.available_from,
+      available_to: formData.available_to,
+      landlord_phone: formData.landlordNum.trim(),
+      landlord_email: formData.landlordEmail.trim(),
+      latitude: resolvedLocation.latitude,
+      longitude: resolvedLocation.longitude,
     };
 
     try {

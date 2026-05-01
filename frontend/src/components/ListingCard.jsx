@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
-import { formatAmenityLabel, normalizeListing } from "../utils/listingUtils";
+import {
+  formatAmenityLabel,
+  formatListingPrice,
+  normalizeListing,
+} from "../utils/listingUtils";
+import MessageHostButton from "./MessageHostButton";
 
 function ListingCard({ listing, isFavorited, onToggleFavorite }) {
   const normalizedListing = normalizeListing(listing);
@@ -12,9 +17,12 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
   normalizedListing.available_from && normalizedListing.available_to
     ? `${formatDate(normalizedListing.available_from)} – ${formatDate(normalizedListing.available_to)}`
     : null;
-  const distanceLabel = normalizedListing.campus
-    ? `${normalizedListing.distance} miles from ${normalizedListing.campus}`
-    : `${normalizedListing.distance} miles from campus`;
+  const hasDistance = typeof normalizedListing.distance === "number";
+  const distanceLabel = hasDistance
+    ? normalizedListing.campus
+      ? `${normalizedListing.distance} miles from ${normalizedListing.campus}`
+      : `${normalizedListing.distance} miles from Rutgers`
+    : null;
 
   const handleFavoriteClick = (event) => {
     event.preventDefault();
@@ -33,7 +41,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
           />
 
           <div className="absolute bottom-4 left-4 rounded-full bg-red-600 px-4 py-2 text-lg font-semibold text-white shadow">
-            ${normalizedListing.price}/mo
+            {formatListingPrice(normalizedListing)}
           </div>
 
           <button
@@ -48,9 +56,16 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
 
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
-            <h2 className="text-3xl font-semibold text-slate-900">
-              {normalizedListing.title}
-            </h2>
+            <div>
+              <h2 className="text-3xl font-semibold text-slate-900">
+                {normalizedListing.title}
+              </h2>
+              {normalizedListing.isImported && normalizedListing.sourceName && (
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {normalizedListing.sourceName}
+                </p>
+              )}
+            </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium capitalize text-slate-700">
               {normalizedListing.propertyType}
             </span>
@@ -67,7 +82,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
             {normalizedListing.baths > 0 && (
               <span>{normalizedListing.baths} baths</span>
             )}
-            <span>{distanceLabel}</span>
+            {distanceLabel && <span>{distanceLabel}</span>}
           </div>
 
           {activeAmenities.length > 0 && (
@@ -76,10 +91,12 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
             </p>
           )}
 
-          {(availRange || normalizedListing.landlordEmail) && (
+          {(availRange || normalizedListing.landlordEmail || normalizedListing.sourceName) && (
             <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm">
               <span className="truncate text-slate-600">
-                {normalizedListing.landlordEmail || "Contact info available in details"}
+                {normalizedListing.landlordEmail ||
+                  normalizedListing.sourceName ||
+                  "Contact info available in details"}
               </span>
               {availRange && (
                 <span className="font-medium text-red-600">
@@ -87,6 +104,14 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
                 </span>
               )}
             </div>
+          )}
+
+          {normalizedListing.host_id && (
+            <MessageHostButton
+              listing={normalizedListing}
+              stopPropagation
+              className="mt-5 w-full rounded-lg border border-red-600 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400 disabled:hover:bg-white"
+            />
           )}
         </div>
       </div>

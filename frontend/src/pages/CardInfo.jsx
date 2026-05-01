@@ -7,8 +7,16 @@ import { useListings } from "../context/ListingsContext";
 
 const CardInfo = () => {
     const params = useParams();
-    const { getListingById } = useListings();
+    const { getListingById, isLoading } = useListings();
     const foundListing = getListingById(params.listingId);
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-[1600px] px-6 py-10 text-slate-600">
+        Loading listing details...
+      </div>
+    );
+  }
 
   if (foundListing) {
     return (

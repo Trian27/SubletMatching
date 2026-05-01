@@ -4,9 +4,12 @@ const CardDescription = ({ foundListing }) => {
   const activeAmenities = Object.entries(foundListing.amenities ?? {})
     .filter(([, value]) => value)
     .map(([key]) => formatAmenityLabel(key));
-  const distanceLabel = foundListing.campus
-    ? `${foundListing.distance} miles from ${foundListing.campus}`
-    : `${foundListing.distance} miles from campus`;
+  const hasDistance = typeof foundListing.distance === "number";
+  const distanceLabel = hasDistance
+    ? foundListing.campus
+      ? `${foundListing.distance} miles from ${foundListing.campus}`
+      : `${foundListing.distance} miles from Rutgers`
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -25,7 +28,7 @@ const CardDescription = ({ foundListing }) => {
           <h3 className="text-lg text-slate-700">
             {foundListing.beds} bedroom{foundListing.beds === 1 ? "" : "s"}
             {foundListing.baths > 0 && ` | ${foundListing.baths} bathroom${foundListing.baths === 1 ? "" : "s"}`}
-            {` | ${distanceLabel}`}
+            {distanceLabel ? ` | ${distanceLabel}` : ""}
           </h3>
         </div>
 

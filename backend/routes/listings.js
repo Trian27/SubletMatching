@@ -1,231 +1,107 @@
 import { Router } from 'express'
 import { supabase, isSupabaseConfigured, createSupabaseClientWithToken } from '../supabaseClient.js'
 import { requireSupabaseUser } from '../middleware/requireSupabaseUser.js'
+import {
+  createLocalListing,
+  deleteLocalListing,
+  getImportMetadata,
+  getLocalListingById,
+  listLocalListings,
+  updateLocalListing,
+} from '../localDatabase.js'
+import {
+  RUTGERS_SOURCE,
+  syncRutgersMarketplaceListings,
+} from '../rutgersMarketplaceImporter.js'
 
 const router = Router()
+const VALID_CAMPUS_LOCATIONS = ['Busch', 'College Ave', 'Livingston', 'Cook/Douglass']
 
-function mapListingRow(data) {
+function mapSupabaseListingRow(data) {
   return {
     id: data.id,
     title: data.title,
+    address: data.address || '',
+    description: data.description || '',
     price: data.price_monthly,
+    priceLabel: data.price_monthly ? `$${data.price_monthly}` : '',
     beds: data.beds,
+    baths: data.baths ?? 0,
     propertyType: data.property_type,
     distance: data.distance,
     amenities: data.amenities || {},
-    campus_location: data.campus_location,
-    description: data.description,
-    image_url: data.image_url,
-    host_id: data.host_id,
+    campus: data.campus_location || '',
+    campus_location: data.campus_location || '',
+    available_from: data.available_from || '',
+    available_to: data.available_to || '',
+    landlordNum: data.landlord_phone || '',
+    landlordEmail: data.landlord_email || '',
+    image: data.image_url || '',
+    image_url: data.image_url || '',
+    images: Array.isArray(data.images) ? data.images : [data.image_url].filter(Boolean),
+    source: 'supabase',
+    sourceName: 'Supabase',
+    sourceUrl: '',
+    isImported: false,
     created_at: data.created_at,
+    host_id: data.host_id,
   }
 }
 
-// GET all listings with Rutgers-specific filters
-router.get('/', async (req, res) => {
-  try {
-    let query = supabase.from('listings').select('*')
+function filterListings(listings, query) {
+  const minPrice = toNullableNumber(query.min_price)
+  const maxPrice = toNullableNumber(query.max_price)
+  const beds = toNullableNumber(query.beds)
+  const propertyType = query.property_type?.toLowerCase()
+  const campus = query.campus?.toLowerCase()
 
-    // Aligned with your schema: campus_location
-    if (req.query.campus) {
-      query = query.ilike('campus_location', `%${req.query.campus}%`)
-    }
-    // Aligned with your schema: price_monthly
-    if (req.query.min_price) {
-      query = query.gte('price_monthly', Number(req.query.min_price))
-    }
-    if (req.query.max_price) {
-      query = query.lte('price_monthly', Number(req.query.max_price))
-    }
-    // Aligned with your schema: beds
-    if (req.query.beds) {
-      query = query.eq('beds', Number(req.query.beds))
-    }
-    if (req.query.property_type) {
-      query = query.eq('property_type', req.query.property_type)
-    }
+  return listings.filter((listing) => {
+    const listingPrice = Number(listing.price ?? 0)
+    const listingBeds = Number(listing.beds ?? 0)
+    const listingCampus = String(listing.campus || listing.campus_location || '').toLowerCase()
+    const listingPropertyType = String(listing.propertyType || '').toLowerCase()
 
-    query = query.order('created_at', { ascending: false })
+    if (minPrice != null && listingPrice < minPrice) return false
+    if (maxPrice != null && listingPrice > maxPrice) return false
+    if (beds != null && listingBeds !== beds) return false
+    if (propertyType && listingPropertyType !== propertyType) return false
+    if (campus && !listingCampus.includes(campus)) return false
 
-    const { data, error } = await query
+    return true
+  })
+}
 
-    if (error) {
-      console.error('GET /listings Supabase error:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        status: error.status,
-        name: error.name,
-        cause: error.cause,
-      })
-      return res.status(400).json({
-        error: error.message,
-        code: error.code,
-        status: error.status,
-        hint: error.hint,
-        details: error.details,
-      })
-    }
-
-    // Map database columns to frontend expected format
-    const mappedData = data.map(listing => ({
-      id: listing.id,
-      title: listing.title,
-      price: listing.price_monthly,  // Map price_monthly to price
-      beds: listing.beds,
-      propertyType: listing.property_type,  // Map property_type to propertyType
-      distance: listing.distance,
-      amenities: listing.amenities || {},  // Ensure amenities is an object
-      // Include additional fields that might be useful
-      campus_location: listing.campus_location,
-      description: listing.description,
-      image_url: listing.image_url,
-      host_id: listing.host_id,
-      created_at: listing.created_at
-    }))
-
-    res.json(mappedData)
-  } catch (err) {
-    console.error('GET /listings unexpected error:', {
-      message: err?.message,
-      name: err?.name,
-      cause: err?.cause,
-      stack: err?.stack,
-    })
-    res.status(500).json({
-      error: err?.message || 'Internal server error',
-      name: err?.name,
-      cause: err?.cause,
+router.get('/import-status', (req, res) => {
+  if (isSupabaseConfigured) {
+    return res.json({
+      mode: 'supabase',
+      message: 'Local Rutgers import is disabled while Supabase mode is active.',
     })
   }
+
+  res.json({
+    mode: 'local-sqlite',
+    source: RUTGERS_SOURCE,
+    ...getImportMetadata(RUTGERS_SOURCE),
+  })
 })
 
-// GET single listing by ID
-router.get('/:id', async (req, res, next) => {
-  // Let the dedicated /favorites route handle this path.
-  if (req.params.id === 'favorites') return next()
-  try {
-    const { data, error } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('id', req.params.id)
-      .single()
+router.post('/import-external', async (req, res) => {
+  if (isSupabaseConfigured) {
+    return res.status(409).json({
+      error: 'Local Rutgers import is disabled while Supabase mode is active.',
+    })
+  }
 
-    if (error) return res.status(404).json({ error: 'Listing not found' })
-    
-    // Map database columns to frontend expected format
-    const mappedListing = {
-      id: data.id,
-      title: data.title,
-      price: data.price_monthly,  // Map price_monthly to price
-      beds: data.beds,
-      propertyType: data.property_type,  // Map property_type to propertyType
-      distance: data.distance,
-      amenities: data.amenities || {},  // Ensure amenities is an object
-      // Include additional fields that might be useful
-      campus_location: data.campus_location,
-      description: data.description,
-      image_url: data.image_url,
-      host_id: data.host_id,
-      created_at: data.created_at
-    }
-    
-    res.json(mappedListing)
-  } catch (err) {
-    res.status(500).json({ error: 'Internal server error' })
+  try {
+    const result = await syncRutgersMarketplaceListings({ force: true })
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Could not import Rutgers listings.' })
   }
 })
 
-// CREATE a new listing (Updated to match Frontend & Schema)
-router.post('/', requireSupabaseUser, async (req, res) => {
-  try {
-    const {
-      title,
-      description,
-      price_monthly,
-      campus_location,
-      beds,
-      property_type,
-      distance,
-      image_url,
-      amenities,
-      host_id: host_id_body,
-    } = req.body
-
-    const host_id = isSupabaseConfigured
-      ? req.user?.id
-      : (host_id_body || 'guest')
-
-    const accessToken =
-      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
-        ? req.headers.authorization.slice(7)
-        : null
-
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
-
-    if (!title || !price_monthly) {
-      return res.status(400).json({ error: 'Title and price_monthly are required' })
-    }
-
-    if (!host_id) {
-      return res.status(400).json({
-        error: isSupabaseConfigured
-          ? 'Could not resolve host from session'
-          : 'host_id is required when not using Supabase auth',
-      })
-    }
-
-    // Validation: price_monthly must be positive
-    if (price_monthly <= 0) {
-      return res.status(400).json({ error: 'price_monthly must be a positive number' })
-    }
-
-    // Validation: campus_location must be one of the allowed values
-    const validCampusLocations = ['Busch', 'College Ave', 'Livingston', 'Cook/Douglass']
-    if (campus_location && !validCampusLocations.includes(campus_location)) {
-      return res.status(400).json({ 
-        error: `campus_location must be one of: ${validCampusLocations.join(', ')}` 
-      })
-    }
-
-    const { data, error } = await authenticatedSupabase
-      .from('listings')
-      .insert({
-        title,
-        description,
-        price_monthly,
-        campus_location,
-        beds,
-        property_type,
-        distance,
-        image_url,
-        amenities, // Stores the JSONB object (parking, laundry, etc.)
-        host_id
-      })
-      .select()
-      .single()
-
-    if (error) {
-      console.error('POST /listings insert error:', error)
-      return res.status(400).json({ error: error.message })
-    }
-
-    if (!data) {
-      console.error('POST /listings: insert returned no data')
-      return res.status(500).json({ error: 'Listing insert did not return a row.' })
-    }
-
-    res.status(201).json(mapListingRow(data))
-  } catch (err) {
-    console.error('POST /listings: unexpected error:', err)
-    res.status(500).json({ error: err?.message || 'Internal server error' })
-  }
-})
-
-// POST /favorites - Add a listing to current user's favorites
+// POST /favorites - Add a listing to the authenticated user's favorites
 router.post('/favorites', requireSupabaseUser, async (req, res) => {
   try {
     const { listing_id } = req.body
@@ -235,27 +111,27 @@ router.post('/favorites', requireSupabaseUser, async (req, res) => {
       return res.status(400).json({ error: 'listing_id is required' })
     }
 
+    if (!user_id) {
+      return res.status(401).json({ error: 'Authorization required.' })
+    }
+
     const accessToken =
       req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : null
 
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
 
-    // Insert the favorite (RLS will ensure the user can only add their own favorites)
     const { data, error } = await authenticatedSupabase
       .from('favorites')
       .insert({
         listing_id,
-        user_id
+        user_id,
       })
       .select()
       .single()
 
     if (error) {
-      // Check if it's a duplicate favorite error
       if (error.code === '23505') {
         return res.status(409).json({ error: 'Listing already in favorites' })
       }
@@ -268,48 +144,49 @@ router.post('/favorites', requireSupabaseUser, async (req, res) => {
   }
 })
 
-// GET /favorites - Get current user's favorites
+// GET /favorites - Get all favorites for the authenticated user
 router.get('/favorites', requireSupabaseUser, async (req, res) => {
   try {
-    const userId = req.user?.id
+    const user_id = req.user?.id
+
+    if (!user_id) {
+      return res.status(401).json({ error: 'Authorization required.' })
+    }
+
     const accessToken =
       req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : null
 
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
 
-    // Get user's favorites with listing details
     const { data, error } = await authenticatedSupabase
       .from('favorites')
       .select(`
         *,
         listings (*)
       `)
-      .eq('user_id', userId)
+      .eq('user_id', user_id)
 
     if (error) return res.status(400).json({ error: error.message })
 
-    // Map the data to include properly formatted listings
-    const mappedFavorites = data.map(favorite => ({
+    const mappedFavorites = data.map((favorite) => ({
       id: favorite.id,
       user_id: favorite.user_id,
       listing_id: favorite.listing_id,
       created_at: favorite.created_at,
-      listing: {
+      listing: favorite.listings ? {
         id: favorite.listings.id,
         title: favorite.listings.title,
-        price: favorite.listings.price_monthly,  // Map price_monthly to price
+        price: favorite.listings.price_monthly,
         beds: favorite.listings.beds,
-        propertyType: favorite.listings.property_type,  // Map property_type to propertyType
+        propertyType: favorite.listings.property_type,
         distance: favorite.listings.distance,
-        amenities: favorite.listings.amenities || {},  // Ensure amenities is an object
+        amenities: favorite.listings.amenities || {},
         campus_location: favorite.listings.campus_location,
         description: favorite.listings.description,
-        image_url: favorite.listings.image_url
-      }
+        image_url: favorite.listings.image_url,
+      } : null,
     }))
 
     res.json(mappedFavorites)
@@ -318,23 +195,26 @@ router.get('/favorites', requireSupabaseUser, async (req, res) => {
   }
 })
 
-// DELETE /favorites/:id - Remove current user's favorite
-router.delete('/favorites/:id', requireSupabaseUser, async (req, res) => {
+router.delete('/favorites/:listingId', requireSupabaseUser, async (req, res) => {
   try {
+    const user_id = req.user?.id
+
+    if (!user_id) {
+      return res.status(401).json({ error: 'Authorization required.' })
+    }
+
     const accessToken =
       req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : null
 
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
 
     const { error } = await authenticatedSupabase
       .from('favorites')
       .delete()
-      .eq('id', req.params.id)
-      .eq('user_id', req.user?.id)
+      .eq('user_id', user_id)
+      .eq('listing_id', req.params.listingId)
 
     if (error) return res.status(400).json({ error: error.message })
     res.status(204).send()
@@ -343,10 +223,208 @@ router.delete('/favorites/:id', requireSupabaseUser, async (req, res) => {
   }
 })
 
-// UPDATE a listing (owner only when using real Supabase)
+router.get('/', async (req, res) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.json(filterListings(listLocalListings(), req.query))
+    }
+
+    let query = supabase.from('listings').select('*')
+
+    if (req.query.campus) {
+      query = query.ilike('campus_location', `%${req.query.campus}%`)
+    }
+    if (req.query.min_price) {
+      query = query.gte('price_monthly', Number(req.query.min_price))
+    }
+    if (req.query.max_price) {
+      query = query.lte('price_monthly', Number(req.query.max_price))
+    }
+    if (req.query.beds) {
+      query = query.eq('beds', Number(req.query.beds))
+    }
+    if (req.query.property_type) {
+      query = query.eq('property_type', req.query.property_type)
+    }
+
+    query = query.order('created_at', { ascending: false })
+
+    const { data, error } = await query
+
+    if (error) {
+      return res.status(400).json({ error: error.message })
+    }
+
+    res.json(data.map(mapSupabaseListingRow))
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.get('/:id', async (req, res) => {
+  try {
+    if (!isSupabaseConfigured) {
+      const listing = getLocalListingById(req.params.id)
+      return listing
+        ? res.json(listing)
+        : res.status(404).json({ error: 'Listing not found' })
+    }
+
+    const { data, error } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+
+    if (error) return res.status(404).json({ error: 'Listing not found' })
+    res.json(mapSupabaseListingRow(data))
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.post('/', requireSupabaseUser, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      address,
+      price_monthly,
+      price_label,
+      campus_location,
+      beds,
+      baths,
+      property_type,
+      distance,
+      image_url,
+      images,
+      amenities,
+      available_from,
+      available_to,
+      landlord_phone,
+      landlord_email,
+      latitude,
+      longitude,
+      host_id: host_id_body,
+    } = req.body
+
+    const host_id = isSupabaseConfigured
+      ? req.user?.id
+      : host_id_body || 'local-guest'
+
+    if (!title || !price_monthly) {
+      return res.status(400).json({ error: 'Title and price_monthly are required' })
+    }
+
+    if (Number(price_monthly) <= 0) {
+      return res.status(400).json({ error: 'price_monthly must be a positive number' })
+    }
+
+    if (campus_location && !VALID_CAMPUS_LOCATIONS.includes(campus_location)) {
+      return res.status(400).json({
+        error: `campus_location must be one of: ${VALID_CAMPUS_LOCATIONS.join(', ')}`,
+      })
+    }
+
+    if (!isSupabaseConfigured) {
+      const created = createLocalListing({
+        title,
+        description,
+        address,
+        price_monthly,
+        price_label,
+        campus_location,
+        beds,
+        baths,
+        property_type,
+        distance,
+        image_url,
+        images,
+        amenities,
+        available_from,
+        available_to,
+        landlord_phone,
+        landlord_email,
+        latitude,
+        longitude,
+        host_id,
+      })
+
+      return res.status(201).json(created)
+    }
+
+    const accessToken =
+      req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null
+
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
+
+    const { data, error } = await authenticatedSupabase
+      .from('listings')
+      .insert({
+        title,
+        description,
+        address,
+        price_monthly,
+        price_label,
+        campus_location,
+        beds,
+        baths,
+        property_type,
+        distance,
+        image_url,
+        images,
+        amenities,
+        available_from,
+        available_to,
+        landlord_phone,
+        landlord_email,
+        latitude,
+        longitude,
+        host_id,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('POST /listings insert error:', error)
+      return res.status(400).json({ error: error.message })
+    }
+
+    if (!data) {
+      return res.status(500).json({ error: 'Listing insert did not return a row.' })
+    }
+
+    res.status(201).json(mapSupabaseListingRow(data))
+  } catch (err) {
+    console.error('POST /listings unexpected error:', err)
+    res.status(500).json({ error: err?.message || 'Internal server error' })
+  }
+})
+
 router.put('/:id', requireSupabaseUser, async (req, res) => {
   try {
     const id = req.params.id
+
+    if (!isSupabaseConfigured) {
+      const existing = getLocalListingById(id)
+      if (!existing) {
+        return res.status(404).json({ error: 'Listing not found' })
+      }
+
+      const updates = { ...req.body }
+      delete updates.id
+      delete updates.host_id
+      delete updates.created_at
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: 'No updatable fields provided' })
+      }
+
+      const updated = updateLocalListing(id, updates)
+      return res.json(updated)
+    }
 
     const { data: existing, error: fetchErr } = await supabase
       .from('listings')
@@ -358,10 +436,7 @@ router.put('/:id', requireSupabaseUser, async (req, res) => {
       return res.status(404).json({ error: 'Listing not found' })
     }
 
-    if (
-      isSupabaseConfigured &&
-      String(existing.host_id) !== String(req.user.id)
-    ) {
+    if (String(existing.host_id) !== String(req.user.id)) {
       return res.status(403).json({ error: 'You can only edit your own listings.' })
     }
 
@@ -375,13 +450,11 @@ router.put('/:id', requireSupabaseUser, async (req, res) => {
     }
 
     const accessToken =
-      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
+      req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : null
 
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
 
     const { data, error } = await authenticatedSupabase
       .from('listings')
@@ -392,16 +465,25 @@ router.put('/:id', requireSupabaseUser, async (req, res) => {
 
     if (error) return res.status(400).json({ error: error.message })
 
-    res.json(mapListingRow(data))
+    res.json(mapSupabaseListingRow(data))
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
-// DELETE a listing (owner only when using real Supabase)
 router.delete('/:id', requireSupabaseUser, async (req, res) => {
   try {
     const id = req.params.id
+
+    if (!isSupabaseConfigured) {
+      const existing = getLocalListingById(id)
+      if (!existing) {
+        return res.status(404).json({ error: 'Listing not found' })
+      }
+
+      deleteLocalListing(id)
+      return res.status(204).send()
+    }
 
     const { data: existing, error: fetchErr } = await supabase
       .from('listings')
@@ -413,21 +495,16 @@ router.delete('/:id', requireSupabaseUser, async (req, res) => {
       return res.status(404).json({ error: 'Listing not found' })
     }
 
-    if (
-      isSupabaseConfigured &&
-      String(existing.host_id) !== String(req.user.id)
-    ) {
+    if (String(existing.host_id) !== String(req.user.id)) {
       return res.status(403).json({ error: 'You can only delete your own listings.' })
     }
 
     const accessToken =
-      isSupabaseConfigured && req.headers.authorization?.startsWith('Bearer ')
+      req.headers.authorization?.startsWith('Bearer ')
         ? req.headers.authorization.slice(7)
         : null
 
-    const authenticatedSupabase = isSupabaseConfigured
-      ? createSupabaseClientWithToken(accessToken)
-      : supabase
+    const authenticatedSupabase = createSupabaseClientWithToken(accessToken)
 
     const { error } = await authenticatedSupabase.from('listings').delete().eq('id', id)
 
@@ -437,5 +514,11 @@ router.delete('/:id', requireSupabaseUser, async (req, res) => {
     res.status(500).json({ error: 'Internal server error' })
   }
 })
+
+function toNullableNumber(value) {
+  if (value == null || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
 
 export default router

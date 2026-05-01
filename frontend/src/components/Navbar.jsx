@@ -36,6 +36,9 @@ function Navbar() {
           <NavLink to="/favorites" className={linkClass}>
             Favorites
           </NavLink>
+          <NavLink to="/inbox" className={linkClass}>
+            Inbox
+          </NavLink>
         </div>
 
         <Link
@@ -50,4 +53,3 @@ function Navbar() {
 }
 
 export default Navbar;
-

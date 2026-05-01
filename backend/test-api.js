@@ -1,6 +1,7 @@
 import fetch from 'node-fetch'
 
 const BASE_URL = 'http://localhost:3001'
+const ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN
 
 async function testEndpoints() {
   try {
@@ -16,22 +17,34 @@ async function testEndpoints() {
     console.log('- Has "propertyType" (mapped from property_type):', !!listings[0].propertyType)
     console.log('- Has "amenities" object:', typeof listings[0].amenities === 'object')
     
+    if (!ACCESS_TOKEN) {
+      console.log('\n\nSkipping authenticated favorites tests.')
+      console.log('Set SUPABASE_ACCESS_TOKEN to test POST/GET /favorites.')
+      return
+    }
+
     console.log('\n\nTesting POST /favorites...')
     const favoritesResponse = await fetch(`${BASE_URL}/listings/favorites`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+      },
       body: JSON.stringify({
         listing_id: 1,
-        user_id: 'test_user'
       })
     })
     const favorite = await favoritesResponse.json()
     console.log('✅ POST /favorites response:', JSON.stringify(favorite, null, 2))
     
-    console.log('\n\nTesting GET /favorites/:userId...')
-    const userFavoritesResponse = await fetch(`${BASE_URL}/listings/favorites/user_1`)
+    console.log('\n\nTesting GET /favorites...')
+    const userFavoritesResponse = await fetch(`${BASE_URL}/listings/favorites`, {
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+      },
+    })
     const userFavorites = await userFavoritesResponse.json()
-    console.log('✅ GET /favorites/user_1 response:')
+    console.log('✅ GET /favorites response:')
     console.log('Favorites count:', userFavorites.length)
     if (userFavorites.length > 0) {
       console.log('First favorite structure:', JSON.stringify(userFavorites[0], null, 2))

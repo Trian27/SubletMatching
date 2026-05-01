@@ -5,32 +5,53 @@ dotenv.config()
 
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-
-/** True when using real Supabase (JWT auth + DB). False when using in-memory mock. */
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && supabaseUrl !== 'your-supabase-url-here'
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+const listingsStorageMode = (process.env.LISTINGS_STORAGE || 'supabase').toLowerCase()
+const hasRealCredentials = Boolean(
+  supabaseUrl &&
+    supabaseAnonKey &&
+    supabaseUrl !== 'your-supabase-url-here' &&
+    supabaseAnonKey !== 'your-supabase-anon-key-here'
 )
 
-const hasRealCredentials = isSupabaseConfigured
+/**
+ * Listings storage defaults to Supabase when credentials exist.
+ * Set LISTINGS_STORAGE=local to force the local SQLite/Rutgers importer mode.
+ */
+export const isSupabaseConfigured = Boolean(
+  listingsStorageMode !== 'local' && hasRealCredentials
+)
 
 let supabase
+let supabaseAdmin = null
 
-if (hasRealCredentials) {
+if (isSupabaseConfigured) {
   supabase = createClient(supabaseUrl, supabaseAnonKey)
+  if (supabaseServiceRoleKey) {
+    supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    })
+  }
   console.log('✅  Connected to Supabase')
 } else {
-  console.log('⚠️  No Supabase credentials found — running with mock data')
+  console.log(
+    `⚠️  Using ${hasRealCredentials ? 'local' : 'mock'} listings storage`
+  )
   supabase = createMockClient()
 }
 
 export { supabase }
+export { supabaseAdmin }
 
 /**
  * Create a Supabase client that authenticates as the user represented by `accessToken`.
  * Used to ensure RLS policies evaluate `auth.uid()` correctly for write operations.
  */
 export function createSupabaseClientWithToken(accessToken) {
-  if (!hasRealCredentials) return supabase
+  if (!isSupabaseConfigured) return supabase
   const token = accessToken?.trim()
   if (!token) return supabase
 

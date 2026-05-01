@@ -6,6 +6,12 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toNullableNumber(value) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function normalizeListing(listing) {
   if (!listing) return null;
 
@@ -28,12 +34,13 @@ export function normalizeListing(listing) {
     address: listing.address?.trim() || "",
     campus: listing.campus?.trim() || "",
     price: toNumber(listing.price, 0),
+    priceLabel: listing.priceLabel?.trim?.() || listing.price_label?.trim?.() || "",
     beds,
     bedrooms: beds,
     baths,
     bathrooms: baths,
     propertyType: (listing.propertyType || "apartment").toLowerCase(),
-    distance: toNumber(listing.distance, 0),
+    distance: toNullableNumber(listing.distance),
     description: listing.description?.trim() || "No description has been added for this listing yet.",
     landlordNum: listing.landlordNum?.trim() || "",
     landlordEmail: listing.landlordEmail?.trim() || "",
@@ -43,6 +50,9 @@ export function normalizeListing(listing) {
     longitude: listing.longitude ? toNumber(listing.longitude) : null,
     images,
     image: primaryImage,
+    sourceName: listing.sourceName?.trim?.() || "",
+    sourceUrl: listing.sourceUrl?.trim?.() || "",
+    isImported: Boolean(listing.isImported),
     amenities: {
       Parking: Boolean(amenities.Parking ?? amenities.parking),
       Laundry: Boolean(amenities.Laundry ?? amenities.laundry),
@@ -68,6 +78,21 @@ export function getNextListingId(listings = []) {
 
 export function formatAmenityLabel(key) {
   return key.replaceAll("_", " ");
+}
+
+export function formatListingPrice(listing, suffix = "/mo") {
+  const normalized = normalizeListing(listing);
+  if (!normalized) return "Price unavailable";
+
+  if (normalized.priceLabel) {
+    return normalized.priceLabel === "Ask"
+      ? "Ask"
+      : normalized.priceLabel.includes("/")
+        ? normalized.priceLabel
+        : `${normalized.priceLabel}${suffix}`;
+  }
+
+  return normalized.price > 0 ? `$${normalized.price}${suffix}` : "Price unavailable";
 }
 
 function normalizeImageEntry(image, index) {

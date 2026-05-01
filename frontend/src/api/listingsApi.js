@@ -1,7 +1,10 @@
 const DEFAULT_BASE = "http://localhost:3001";
+const DEFAULT_TIMEOUT_MS = 10000;
 
 export function getListingsApiBase() {
-  const base = import.meta.env.VITE_API_URL?.replace(/\/$/, "") ?? DEFAULT_BASE;
+  const configuredBase =
+    import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  const base = configuredBase?.replace(/\/$/, "") ?? DEFAULT_BASE;
   return base;
 }
 
@@ -9,6 +12,67 @@ export function getListingsApiBase() {
 export function getListingsAccessToken() {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem("sublet_access_token");
+}
+
+async function wait(delayMs) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, delayMs);
+  });
+}
+
+async function parseJsonResponse(response) {
+  return response.json().catch(() => ({}));
+}
+
+async function fetchWithTimeout(url, options = {}) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => {
+    controller.abort();
+  }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Request timed out. Check that the backend is running on port 3001.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+export async function getListings(options = {}) {
+  const retries = options.retries ?? 0;
+  const retryDelayMs = options.retryDelayMs ?? 1000;
+
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(`${getListingsApiBase()}/listings`);
+      const data = await parseJsonResponse(response);
+
+      if (!response.ok) {
+        const message =
+          typeof data.error === "string" ? data.error : "Could not load listings.";
+        const err = new Error(message);
+        err.status = response.status;
+        throw err;
+      }
+
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      if (attempt === retries) {
+        throw error;
+      }
+
+      await wait(retryDelayMs);
+    }
+  }
+
+  return [];
 }
 
 /**
@@ -27,17 +91,85 @@ export async function createListing(payload, options = {}) {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
-  const response = await fetch(`${getListingsApiBase()}/listings`, {
+  const response = await fetchWithTimeout(`${getListingsApiBase()}/listings`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const data = await parseJsonResponse(response);
 
   if (!response.ok) {
     const message =
       typeof data.error === "string" ? data.error : "Could not create listing.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+
+  return data;
+}
+
+function buildAuthHeaders(accessToken) {
+  let token = accessToken ?? getListingsAccessToken();
+  if (typeof token !== "string") token = null;
+  token = token?.trim?.() ?? null;
+
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export async function getFavoriteListings(options = {}) {
+  const response = await fetchWithTimeout(`${getListingsApiBase()}/listings/favorites`, {
+    headers: buildAuthHeaders(options.accessToken),
+  });
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not load favorites.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+
+  return Array.isArray(data) ? data : [];
+}
+
+export async function addFavoriteListing(listingId, options = {}) {
+  const response = await fetchWithTimeout(`${getListingsApiBase()}/listings/favorites`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...buildAuthHeaders(options.accessToken),
+    },
+    body: JSON.stringify({ listing_id: listingId }),
+  });
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok && response.status !== 409) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not save favorite.";
+    const err = new Error(message);
+    err.status = response.status;
+    throw err;
+  }
+
+  return data;
+}
+
+export async function removeFavoriteListing(listingId, options = {}) {
+  const response = await fetchWithTimeout(
+    `${getListingsApiBase()}/listings/favorites/${encodeURIComponent(listingId)}`,
+    {
+      method: "DELETE",
+      headers: buildAuthHeaders(options.accessToken),
+    }
+  );
+  const data = await parseJsonResponse(response);
+
+  if (!response.ok) {
+    const message =
+      typeof data.error === "string" ? data.error : "Could not remove favorite.";
     const err = new Error(message);
     err.status = response.status;
     throw err;

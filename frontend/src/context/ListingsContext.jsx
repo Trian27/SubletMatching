@@ -1,62 +1,109 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import listingsData from "../data/listings";
-import { getListingsApiBase } from "../api/listingsApi";
-import { getNextListingId, normalizeListing, normalizeListings } from "../utils/listingUtils";
+import {
+  createContext,
+  startTransition,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { getListings } from "../api/listingsApi";
+import { normalizeListing, normalizeListings } from "../utils/listingUtils";
 
 const ListingsContext = createContext(null);
 
 export function ListingsProvider({ children }) {
   const [listings, setListings] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const refreshListings = useCallback(async () => {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const nextListings = normalizeListings(
+        await getListings({
+          retries: 1,
+          retryDelayMs: 500,
+        })
+      );
+
+      startTransition(() => {
+        setListings(nextListings);
+      });
+    } catch (loadError) {
+      setError(loadError.message || "Could not load listings.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    let isCancelled = false;
 
-    async function loadListings() {
+    const loadListings = async () => {
+      setError("");
+      setIsLoading(true);
+
       try {
-        const response = await fetch(`${getListingsApiBase()}/listings`);
-        const data = await response.json();
-        if (!response.ok || !Array.isArray(data)) {
-          throw new Error("Failed loading listings");
-        }
-        if (!cancelled) {
-          setListings(normalizeListings(data));
-        }
-      } catch (error) {
-        console.warn("Could not load API listings, using fallback", error);
-        if (!cancelled) {
-          setListings(normalizeListings(listingsData));
+        const nextListings = normalizeListings(
+          await getListings({
+            retries: 1,
+            retryDelayMs: 500,
+          })
+        );
+
+        if (isCancelled) return;
+
+        startTransition(() => {
+          setListings(nextListings);
+        });
+      } catch (loadError) {
+        if (isCancelled) return;
+        setError(loadError.message || "Could not load listings.");
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
         }
       }
-    }
+    };
 
-    void loadListings();
+    loadListings();
+
     return () => {
-      cancelled = true;
+      isCancelled = true;
     };
   }, []);
 
-  const addListing = (listingInput) => {
-    setListings((prev) => {
-      const nextListing = normalizeListing({
-        ...listingInput,
-        id:
-          listingInput.id != null && listingInput.id !== ""
-            ? listingInput.id
-            : getNextListingId(prev),
-      });
+  const addListing = useCallback((listingInput) => {
+    const nextListing = normalizeListing(listingInput);
+    if (!nextListing) return;
 
-      return [nextListing, ...prev];
+    startTransition(() => {
+      setListings((prev) => [
+        nextListing,
+        ...prev.filter((listing) => String(listing.id) !== String(nextListing.id)),
+      ]);
     });
-  };
+  }, []);
 
-  const getListingById = (id) =>
-    listings.find((listing) => String(listing.id) === String(id)) ?? null;
+  const getListingById = useCallback(
+    (id) => listings.find((listing) => String(listing.id) === String(id)) ?? null,
+    [listings]
+  );
 
-  const value = {
-    listings,
-    addListing,
-    getListingById,
-  };
+  const value = useMemo(
+    () => ({
+      listings,
+      addListing,
+      getListingById,
+      refreshListings,
+      isLoading,
+      error,
+    }),
+    [addListing, error, getListingById, isLoading, listings, refreshListings]
+  );
 
   return <ListingsContext.Provider value={value}>{children}</ListingsContext.Provider>;
 }
