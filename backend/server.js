@@ -3,9 +3,12 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import listingsRouter from './routes/listings.js'
 import messagingRouter from './routes/messaging.js'
-import { isSupabaseConfigured } from './supabaseClient.js'
-import { warmRutgersListingCache, RUTGERS_SOURCE } from './rutgersMarketplaceImporter.js'
-import { getImportMetadata } from './localDatabase.js'
+import { isSupabaseConfigured, supabaseAdmin } from './supabaseClient.js'
+import {
+  warmRutgersListingCache,
+  getRutgersImportMetadata,
+  RUTGERS_SOURCE,
+} from './rutgersMarketplaceImporter.js'
 
 dotenv.config()
 
@@ -27,17 +30,18 @@ app.use((req, res, next) => {
 })
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
+  let importStatus
+  try {
+    importStatus = { source: RUTGERS_SOURCE, ...(await getRutgersImportMetadata()) }
+  } catch (error) {
+    importStatus = { source: RUTGERS_SOURCE, status: 'unavailable', error: error.message }
+  }
+
   res.json({
     status: 'ok',
     mode: isSupabaseConfigured ? 'supabase' : 'local-sqlite',
-    import: isSupabaseConfigured ? {
-      source: RUTGERS_SOURCE,
-      status: 'disabled in Supabase mode',
-    } : {
-      source: RUTGERS_SOURCE,
-      ...getImportMetadata(RUTGERS_SOURCE),
-    },
+    import: importStatus,
   })
 })
 
@@ -45,16 +49,25 @@ app.get('/health', (req, res) => {
 app.use('/listings', listingsRouter)
 app.use('/messages', messagingRouter)
 
-if (!isSupabaseConfigured) {
-  try {
-    const result = await warmRutgersListingCache()
-    const importCount = result.importedCount ?? result.lastCount ?? 0
-    console.log(`Local Rutgers cache ready with ${importCount} imported listings`)
-  } catch (error) {
-    console.warn(`Rutgers listing warmup failed: ${error.message}`)
-  }
+// Seed / refresh imported Rutgers listings (every 12h at most).
+// Supabase mode needs SUPABASE_SERVICE_ROLE_KEY. Set RUTGERS_IMPORT_ON_START=false to skip.
+const importOnStart = (process.env.RUTGERS_IMPORT_ON_START || 'true').toLowerCase() !== 'false'
+
+if (!importOnStart) {
+  console.log('Rutgers listing warmup disabled (RUTGERS_IMPORT_ON_START=false)')
+} else if (isSupabaseConfigured && !supabaseAdmin) {
+  console.warn('Rutgers listing warmup skipped: set SUPABASE_SERVICE_ROLE_KEY to import in Supabase mode')
 } else {
-  console.log('Rutgers listing warmup skipped in Supabase mode')
+  // Don't block startup on the scrape.
+  warmRutgersListingCache()
+    .then((result) => {
+      const importCount = result.importedCount ?? result.lastCount ?? 0
+      const mode = isSupabaseConfigured ? 'Supabase' : 'Local'
+      console.log(`${mode} Rutgers listings ready: ${importCount} imported listings`)
+    })
+    .catch((error) => {
+      console.warn(`Rutgers listing warmup failed: ${error.message}`)
+    })
 }
 
 // Start server
