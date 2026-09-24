@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
+import { isAllowedEmail, RUTGERS_EMAIL_HINT } from "../utils/rutgersEmail";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -38,12 +39,20 @@ function LoginPage() {
         if (error) throw error;
         navigate("/");
       } else {
+        if (!isAllowedEmail(email)) {
+          throw new Error(RUTGERS_EMAIL_HINT);
+        }
         const { error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
         });
-        if (error) throw error;
-        setSuccessMessage("Account created. Check your email if confirmation is enabled, then sign in.");
+        if (error) {
+          if (/rutgers email/i.test(error.message || "")) {
+            throw new Error(RUTGERS_EMAIL_HINT);
+          }
+          throw error;
+        }
+        setSuccessMessage("Account created. Check your Rutgers inbox for the confirmation link, then sign in.");
         setMode("signin");
       }
     } catch (error) {
@@ -85,9 +94,12 @@ function LoginPage() {
           onChange={(event) => setEmail(event.target.value)}
           type="email"
           className="mb-4 w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none ring-red-200 focus:ring"
-          placeholder="you@example.com"
+          placeholder={mode === "signup" ? "netid@scarletmail.rutgers.edu" : "you@scarletmail.rutgers.edu"}
           required
         />
+        {mode === "signup" && (
+          <p className="-mt-2 mb-4 text-xs text-slate-500">{RUTGERS_EMAIL_HINT}</p>
+        )}
 
         <label className="mb-2 block text-sm font-medium text-slate-700">
           Password
