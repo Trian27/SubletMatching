@@ -4,13 +4,13 @@ import { requireSupabaseUser } from '../middleware/requireSupabaseUser.js'
 import {
   createLocalListing,
   deleteLocalListing,
-  getImportMetadata,
   getLocalListingById,
   listLocalListings,
   updateLocalListing,
 } from '../localDatabase.js'
 import {
   RUTGERS_SOURCE,
+  getRutgersImportMetadata,
   syncRutgersMarketplaceListings,
 } from '../rutgersMarketplaceImporter.js'
 
@@ -24,7 +24,7 @@ function mapSupabaseListingRow(data) {
     address: data.address || '',
     description: data.description || '',
     price: data.price_monthly,
-    priceLabel: data.price_monthly ? `$${data.price_monthly}` : '',
+    priceLabel: data.price_label || (data.price_monthly ? `$${data.price_monthly}` : ''),
     beds: data.beds,
     baths: data.baths ?? 0,
     propertyType: data.property_type,
@@ -39,10 +39,10 @@ function mapSupabaseListingRow(data) {
     image: data.image_url || '',
     image_url: data.image_url || '',
     images: Array.isArray(data.images) ? data.images : [data.image_url].filter(Boolean),
-    source: 'supabase',
-    sourceName: 'Supabase',
-    sourceUrl: '',
-    isImported: false,
+    source: data.is_imported ? data.source : 'supabase',
+    sourceName: data.is_imported ? data.source_name || '' : 'Supabase',
+    sourceUrl: data.source_url || '',
+    isImported: Boolean(data.is_imported),
     created_at: data.created_at,
     host_id: data.host_id,
   }
@@ -71,28 +71,33 @@ function filterListings(listings, query) {
   })
 }
 
-router.get('/import-status', (req, res) => {
-  if (isSupabaseConfigured) {
-    return res.json({
-      mode: 'supabase',
-      message: 'Local Rutgers import is disabled while Supabase mode is active.',
+router.get('/import-status', async (req, res) => {
+  try {
+    res.json({
+      mode: isSupabaseConfigured ? 'supabase' : 'local-sqlite',
+      source: RUTGERS_SOURCE,
+      ...(await getRutgersImportMetadata()),
     })
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Could not read import status.' })
   }
-
-  res.json({
-    mode: 'local-sqlite',
-    source: RUTGERS_SOURCE,
-    ...getImportMetadata(RUTGERS_SOURCE),
-  })
 })
 
-router.post('/import-external', async (req, res) => {
-  if (isSupabaseConfigured) {
-    return res.status(409).json({
-      error: 'Local Rutgers import is disabled while Supabase mode is active.',
-    })
+// In Supabase (production) mode, triggering a re-scrape requires
+// the IMPORT_ADMIN_TOKEN header so random visitors can't spam the Rutgers site.
+function requireImportAdmin(req, res, next) {
+  if (!isSupabaseConfigured) return next()
+  const expected = process.env.IMPORT_ADMIN_TOKEN
+  if (!expected) {
+    return res.status(403).json({ error: 'Set IMPORT_ADMIN_TOKEN to trigger imports in Supabase mode.' })
   }
+  if (req.headers['x-import-token'] !== expected) {
+    return res.status(401).json({ error: 'Invalid import token.' })
+  }
+  next()
+}
 
+router.post('/import-external', requireImportAdmin, async (req, res) => {
   try {
     const result = await syncRutgersMarketplaceListings({ force: true })
     res.json(result)
