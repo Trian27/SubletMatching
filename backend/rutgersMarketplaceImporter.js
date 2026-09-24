@@ -1,4 +1,9 @@
 import { getImportMetadata, replaceImportedListings } from './localDatabase.js'
+import { isSupabaseConfigured } from './supabaseClient.js'
+import {
+  getSupabaseImportMetadata,
+  replaceImportedListingsInSupabase,
+} from './supabaseListingImporter.js'
 
 export const RUTGERS_SOURCE = 'rutgers_off_campus'
 export const RUTGERS_SOURCE_NAME = 'Rutgers Off-Campus Marketplace'
@@ -13,7 +18,7 @@ const TITLE_PATTERN = /<title>(?<title>[^<]+)<\/title>/i
 export async function warmRutgersListingCache(options = {}) {
   const force = options.force === true
   const maxAgeMs = options.maxAgeMs ?? 1000 * 60 * 60 * 12
-  const importMetadata = getImportMetadata(RUTGERS_SOURCE)
+  const importMetadata = await getRutgersImportMetadata()
 
   const shouldRefresh =
     force ||
@@ -34,10 +39,40 @@ export async function warmRutgersListingCache(options = {}) {
 export async function syncRutgersMarketplaceListings(options = {}) {
   const fetchedAt = new Date().toISOString()
   const indexHtml = await fetchHtml(RUTGERS_LIST_URL)
+
+  // The marketplace now embeds every listing as JSON (`var listingData = ...`)
+  // instead of linking detail pages, so parse that first. Fall back to the old
+  // detail-page scrape if the page layout changes back.
+  let listings = parseEmbeddedListingData(indexHtml)
+  if (options.limit) listings = listings.slice(0, options.limit)
+
+  if (listings.length === 0) {
+    listings = await scrapeDetailPages(indexHtml, options)
+  }
+
+  if (listings.length === 0) {
+    throw new Error('Rutgers marketplace import completed, but no listings could be parsed.')
+  }
+
+  if (isSupabaseConfigured) {
+    await replaceImportedListingsInSupabase(RUTGERS_SOURCE, listings, { fetchedAt })
+  } else {
+    replaceImportedListings(RUTGERS_SOURCE, listings, { fetchedAt })
+  }
+
+  return {
+    refreshed: true,
+    mode: isSupabaseConfigured ? 'supabase' : 'local-sqlite',
+    fetchedAt,
+    importedCount: listings.length,
+  }
+}
+
+async function scrapeDetailPages(indexHtml, options = {}) {
   const detailUrls = extractDetailUrls(indexHtml).slice(0, options.limit ?? 48)
 
   if (detailUrls.length === 0) {
-    throw new Error('Could not find Rutgers marketplace listing detail pages.')
+    throw new Error('Could not find Rutgers marketplace listings (no embedded data or detail links).')
   }
 
   const listings = []
@@ -60,17 +95,175 @@ export async function syncRutgersMarketplaceListings(options = {}) {
     listings.push(...batchResults.filter(Boolean))
   }
 
-  if (listings.length === 0) {
-    throw new Error('Rutgers marketplace import completed, but no listings could be parsed.')
+  return listings
+}
+
+export async function getRutgersImportMetadata() {
+  if (isSupabaseConfigured) {
+    return getSupabaseImportMetadata(RUTGERS_SOURCE)
+  }
+  return getImportMetadata(RUTGERS_SOURCE)
+}
+
+const LISTING_DATA_MARKER = 'var listingData = JSON.parse(JSON.stringify('
+const IMAGE_BASE_URL = 'https://rcp-prod-uploads.s3.amazonaws.com/property_images/slider_images/'
+// The site redirects to the right city, so one city path works for every slug.
+const DETAIL_URL_BASE = 'https://offcampushousing.rutgers.edu/city/new-brunswick-nj/listing/'
+
+export function parseEmbeddedListingData(html) {
+  const start = html.indexOf(LISTING_DATA_MARKER)
+  if (start === -1) return []
+
+  const json = extractJsonValue(html, start + LISTING_DATA_MARKER.length)
+  if (!json) return []
+
+  let data
+  try {
+    data = JSON.parse(json)
+  } catch (error) {
+    console.warn(`Could not parse embedded Rutgers listing data: ${error.message}`)
+    return []
   }
 
-  replaceImportedListings(RUTGERS_SOURCE, listings, { fetchedAt })
+  const records = Array.isArray(data) ? data : Object.values(data || {})
+  return records
+    .filter((record) => record && record.id && record.slug && String(record.hidden) !== '1')
+    .map(mapEmbeddedListing)
+}
+
+function mapEmbeddedListing(record) {
+  const sourceListingId = String(record.id)
+  const address = fixRunTogetherAddress(record.address || record.campus_address || '')
+  const title = fixRunTogetherAddress(record.title || record.street_address_short || address) || 'Rutgers off-campus listing'
+  const description = decodeDescription(record.description)
+  const price = embeddedPrice(record)
+  const images = (Array.isArray(record.images) ? record.images : [])
+    .filter(Boolean)
+    .slice(0, 12)
+    .map(toImageUrl)
+  const image = record.featured_image ? toImageUrl(record.featured_image) : images[0] || ''
+  const features = JSON.stringify([
+    record.features,
+    record.listingFeatures,
+    record.unitFeatures,
+    record.additional,
+  ]).toLowerCase()
+  const propertyFeatures = record.property_features || {}
 
   return {
-    refreshed: true,
-    fetchedAt,
-    importedCount: listings.length,
+    id: `${RUTGERS_SOURCE}:${sourceListingId}`,
+    sourceListingId,
+    sourceName: RUTGERS_SOURCE_NAME,
+    sourceUrl: `${DETAIL_URL_BASE}${record.slug}`,
+    title,
+    address,
+    description,
+    price: price.value,
+    priceLabel: price.label,
+    beds: toNumber(record.min_bed),
+    baths: toNumber(record.min_bath),
+    propertyType: normalizePropertyType(record.category_title || ''),
+    image,
+    images: images.length ? images : [image].filter(Boolean),
+    distance: walkMinutesToMiles(record.distance, record.list_view_distance),
+    latitude: toNullableFloat(record.lat),
+    longitude: toNullableFloat(record.lng),
+    available_from: /^\d{4}-\d{2}-\d{2}$/.test(record.date || '') ? record.date : null,
+    amenities: {
+      Parking: Boolean(record.parking_allowed || propertyFeatures.parking),
+      Laundry: Boolean(record.laundry_allowed) || /laundry|washer|dryer/.test(features),
+      Pet_Friendly: Boolean(record.pets_allowed || propertyFeatures['pets-allowed']),
+      Furnished: /furnished/.test(features) && !/unfurnished/.test(features),
+    },
   }
+}
+
+function embeddedPrice(record) {
+  const min = Number(record.min_rent)
+  const max = Number(record.max_rent)
+  if (record.hide_pricing || !Number.isFinite(min) || min <= 0) {
+    return { value: 0, label: 'Ask' }
+  }
+  const suffix = record.per_person_property ? ' /person' : ''
+  if (Number.isFinite(max) && max > min) {
+    return { value: min, label: `$${formatPriceNumber(min)} - $${formatPriceNumber(max)}${suffix}` }
+  }
+  return { value: min, label: `$${formatPriceNumber(min)}${suffix}` }
+}
+
+function decodeDescription(value) {
+  if (!value) return ''
+  let html = String(value)
+  // Descriptions are base64-encoded HTML on the current site.
+  if (/^[A-Za-z0-9+/=\s]+$/.test(html) && html.length % 4 === 0) {
+    try {
+      html = Buffer.from(html, 'base64').toString('utf8')
+    } catch {
+      // keep original
+    }
+  }
+  return htmlToTextLines(html).join(' ').slice(0, 4000).trim()
+}
+
+function walkMinutesToMiles(distance, mode) {
+  const match = /(\d+)\s*min/i.exec(String(distance || ''))
+  if (!match) return null
+  const minutes = Number(match[1])
+  if (!Number.isFinite(minutes)) return null
+  // ~12 min per mile walking; drive times are ~2 min per mile.
+  const minutesPerMile = String(mode || 'walk').toLowerCase() === 'walk' ? 12 : 2
+  return Number((minutes / minutesPerMile).toFixed(1))
+}
+
+function toImageUrl(path) {
+  const value = String(path)
+  if (value.startsWith('http')) return value
+  return `${IMAGE_BASE_URL}${value.replace(/^\/+/, '')}`
+}
+
+// "146 Hamilton StNew Brunswick, NJ" -> "146 Hamilton St, New Brunswick, NJ"
+function fixRunTogetherAddress(value) {
+  return String(value)
+    .replace(/\b(St|Ave|Rd|Dr|Ln|Pl|Ct|Blvd|Street|Avenue|Road)(New Brunswick|Highland Park|Piscataway|Somerset|Edison)/g, '$1, $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function toNumber(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function toNullableFloat(value) {
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+// Returns the raw text of the JSON object/array starting at `index`.
+function extractJsonValue(text, index) {
+  let start = index
+  while (start < text.length && /\s/.test(text[start])) start += 1
+  const open = text[start]
+  if (open !== '{' && open !== '[') return null
+  const close = open === '{' ? '}' : ']'
+
+  let depth = 0
+  let inString = false
+  for (let i = start; i < text.length; i += 1) {
+    const char = text[i]
+    if (inString) {
+      if (char === '\\') i += 1
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === open) depth += 1
+    else if (char === close) {
+      depth -= 1
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
 }
 
 function extractDetailUrls(html) {
@@ -225,6 +418,7 @@ function normalizePropertyType(value) {
   if (lowered.includes('house')) return 'house'
   if (lowered.includes('studio')) return 'studio'
   if (lowered.includes('town')) return 'townhome'
+  if (lowered === 'room' || lowered.includes('room')) return 'room'
   return 'apartment'
 }
 
