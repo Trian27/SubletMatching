@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../supabaseClient.js'
+import { isAllowedEmail } from '../rutgersEmail.js'
 
 /**
  * When connected to real Supabase: requires Authorization: Bearer <access_token>,
@@ -55,6 +56,20 @@ export async function requireSupabaseUser(req, res, next) {
         err?.code === "ENOTFOUND"
           ? "Backend cannot reach Supabase (DNS/URL issue). Check SUPABASE_URL."
           : err?.message || "Backend cannot validate session.",
+    })
+  }
+
+  // Rutgers-only: backstop for accounts created before the sign-up trigger
+  // existed, or if the trigger is missing in a given Supabase project.
+  if (!isAllowedEmail(user.email)) {
+    return res.status(403).json({
+      error: 'SubletMatching is limited to Rutgers email accounts.',
+    })
+  }
+
+  if (!user.email_confirmed_at && !user.confirmed_at) {
+    return res.status(403).json({
+      error: 'Please confirm your Rutgers email before continuing.',
     })
   }
 
