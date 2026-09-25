@@ -1,6 +1,6 @@
 import { Listing } from '@/src/types/listing';
 
-const DEFAULT_API_URL = 'http://localhost:3001';
+const DEFAULT_API_URL = 'https://sublet-matching-api.onrender.com';
 
 const FALLBACK_LISTINGS: Listing[] = [
   {
@@ -33,7 +33,7 @@ export function getApiBaseUrl() {
   return process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') ?? DEFAULT_API_URL;
 }
 
-function buildAuthHeaders(accessToken?: string | null) {
+function buildAuthHeaders(accessToken?: string | null): Record<string, string> {
   if (!accessToken) return {};
   return {
     Authorization: `Bearer ${accessToken}`,
