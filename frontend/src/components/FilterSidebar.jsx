@@ -1,4 +1,11 @@
+import { useState } from "react";
+
 function FilterSidebar({ filters, setFilters }) {
+  // Filters start collapsed on phone-sized viewports so listings show first;
+  // expanded on lg+ where the sidebar sits next to the grid.
+  const [open, setOpen] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= 1024
+  );
   const handleBedsChange = (e) => {
     const value = e.target.value;
 
@@ -67,9 +74,19 @@ function FilterSidebar({ filters, setFilters }) {
   };
 
   return (
-    <aside className="sticky top-6 h-fit w-full max-w-xs rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-900">Filters</h2>
+    <aside className="h-fit w-full max-w-none rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:sticky lg:top-6 lg:max-w-xs">
+      <div className={`flex items-center justify-between ${open ? "mb-6" : ""} lg:mb-6`}>
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex items-center gap-2 text-xl font-semibold text-slate-900"
+        >
+          Filters
+          <span aria-hidden="true" className="text-sm text-slate-500 lg:hidden">
+            {open ? "▲" : "▼"}
+          </span>
+        </button>
         <button
           onClick={resetFilters}
           className="text-sm font-medium text-red-600 hover:text-red-700"
@@ -78,7 +95,7 @@ function FilterSidebar({ filters, setFilters }) {
         </button>
       </div>
 
-      <div className="space-y-6">
+      <div className={`space-y-6 ${open ? "" : "hidden"} lg:block`}>
         <div>
           <label className="mb-2 block text-sm font-medium text-slate-700">
             Bedrooms
