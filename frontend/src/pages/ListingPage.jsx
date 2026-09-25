@@ -28,14 +28,14 @@ function ListingPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto flex max-w-[1600px] gap-6 px-6 py-6">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
         <FilterSidebar filters={filters} setFilters={setFilters} />
 
         <main className="flex-1">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-red-600">Available Housing</p>
-              <h1 className="text-3xl font-semibold text-slate-900">
+              <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">
                 {isLoading
                   ? "Loading listings..."
                   : `Showing ${filteredListings.length} listings`}
