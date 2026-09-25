@@ -57,7 +57,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
         <div className="p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-3xl font-semibold text-slate-900">
+              <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
                 {normalizedListing.title}
               </h2>
               {normalizedListing.isImported && normalizedListing.sourceName && (
@@ -77,7 +77,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-6 text-lg text-slate-700">
+          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-base text-slate-700 sm:text-lg">
             <span>{normalizedListing.beds} beds</span>
             {normalizedListing.baths > 0 && (
               <span>{normalizedListing.baths} baths</span>
@@ -92,7 +92,7 @@ function ListingCard({ listing, isFavorited, onToggleFavorite }) {
           )}
 
           {(availRange || normalizedListing.landlordEmail || normalizedListing.sourceName) && (
-            <div className="mt-5 flex items-center justify-between border-t pt-4 text-sm">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-sm">
               <span className="truncate text-slate-600">
                 {normalizedListing.landlordEmail ||
                   normalizedListing.sourceName ||
