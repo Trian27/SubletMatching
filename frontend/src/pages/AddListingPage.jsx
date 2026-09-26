@@ -44,9 +44,9 @@ function AddListingPage() {
     <div className="mx-auto max-w-[1800px] px-6 py-10">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-red-600">Create Listing</p>
+          <p className="text-sm font-medium text-red-600">Post your sublet</p>
           <h1 className="text-3xl font-semibold text-slate-900">
-            Compose a listing with live preview
+            Post your student sublet
           </h1>
         </div>
 
@@ -58,6 +58,11 @@ function AddListingPage() {
         </Link>
       </div>
 
+      <p className="mb-6 max-w-2xl text-sm text-slate-600">
+        Posting uses your Rutgers account and lets interested students message you. It does not
+        verify your lease or confirm the sublet is approved by your landlord. Check your lease
+        and get any required permission before posting.
+      </p>
       <AddListingForm
         onCreated={(listing) => {
           addListing(listing);
