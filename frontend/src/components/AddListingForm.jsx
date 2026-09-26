@@ -8,6 +8,7 @@ import { MAX_LISTING_IMAGES, filesToListingImages } from "../utils/imageUtils";
 import { geocodeAddressToNearestCampus } from "../utils/locationUtils";
 import { normalizeListing } from "../utils/listingUtils";
 import { addOwnedListingId } from "../utils/listingOwnershipCache";
+import { prefillOwnSublet } from "../utils/prefillOwnSublet";
 
 const defaultFormState = {
   title: "",
@@ -46,6 +47,8 @@ const defaultLocationState = {
  */
 export default function AddListingForm({ onCreated }) {
   const { session } = useAuth();
+  const [existingPost, setExistingPost] = useState("");
+  const [prefillNotice, setPrefillNotice] = useState("");
   const [formData, setFormData] = useState({
     ...defaultFormState,
     amenities: { ...defaultFormState.amenities },
@@ -118,6 +121,18 @@ export default function AddListingForm({ onCreated }) {
   const minimumAvailableToDate = formData.available_from
     ? getNextDateString(formData.available_from)
     : today;
+
+  const handlePrefill = () => {
+    const draft = prefillOwnSublet(existingPost);
+    if (!draft.description) return;
+    setFormData((previous) => ({
+      ...previous,
+      title: previous.title || draft.title,
+      description: previous.description || draft.description,
+      price: previous.price || draft.price,
+    }));
+    setPrefillNotice("Draft added. Check every field, add your address and dates, then publish when ready.");
+  };
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -317,7 +332,6 @@ export default function AddListingForm({ onCreated }) {
         title: formData.title.trim(),
         address: formData.address.trim(),
         id: created.id,
-        host_id: created.host_id,
         price: created.price ?? priceMonthly,
         beds: created.beds ?? Number(formData.beds),
         campus: created.campus_location ?? resolvedLocation.campus,
@@ -347,6 +361,32 @@ export default function AddListingForm({ onCreated }) {
   return (
     <div className="grid gap-8 2xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)]">
       <form onSubmit={handleSubmit} className="space-y-8">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-sm font-medium text-red-600">Already wrote your sublet post?</p>
+          <h2 className="mt-1 text-xl font-semibold text-slate-900">Start with your own post</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Paste a post you wrote. We'll fill a draft, not publish it. Only your Rutgers account can post
+            your listing here. Check the address, rent, dates and contact details before publishing.
+          </p>
+          <textarea
+            value={existingPost}
+            onChange={(event) => setExistingPost(event.target.value)}
+            rows={4}
+            maxLength={4000}
+            aria-label="Paste your own sublet post"
+            placeholder="Paste the post you wrote for a housing group"
+            className="mt-4 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm text-slate-900 outline-none ring-red-200 focus:ring"
+          />
+          <button
+            type="button"
+            onClick={handlePrefill}
+            disabled={!existingPost.trim()}
+            className="mt-3 rounded-full border border-slate-300 px-5 py-2 text-sm font-medium text-slate-800 hover:border-red-500 disabled:opacity-50"
+          >
+            Use as draft
+          </button>
+          {prefillNotice && <p role="status" className="mt-3 text-sm text-slate-700">{prefillNotice}</p>}
+        </section>
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -651,7 +691,11 @@ export default function AddListingForm({ onCreated }) {
             </h2>
 
             <div>
-              <h2 className="font-bold">Contact Landlord</h2>
+              <h2 className="font-bold">Contact the poster</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Phone and email are optional. Students can message your Rutgers account in the app.
+                Only add contact details you want public.
+              </p>
             </div>
 
             <div className="mt-4 space-y-4">
@@ -660,7 +704,6 @@ export default function AddListingForm({ onCreated }) {
                   Phone number
                 </span>
                 <input
-                  required
                   type="tel"
                   name="landlordNum"
                   value={formData.landlordNum}
@@ -675,7 +718,6 @@ export default function AddListingForm({ onCreated }) {
                   Email address
                 </span>
                 <input
-                  required
                   type="email"
                   name="landlordEmail"
                   value={formData.landlordEmail}
